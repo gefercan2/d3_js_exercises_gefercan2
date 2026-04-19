@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FIFA World Cup 2022 — Round of 16 Chord Diagram</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0914;
+    color: #e8e4d9;
+    font-family: 'Barlow', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.6rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #f5deb3;
+    margin-top: 28px;
+    text-align: center;
+    line-height: 1.1;
+  }
+
+  h1 span {
+    display: block;
+    font-family: 'Barlow', sans-serif;
+    font-size: 0.38em;
+    letter-spacing: 0.35em;
+    color: #8a7e6b;
+    font-weight: 300;
+    margin-top: 4px;
+  }
+
+  #chart {
+    position: relative;
+    margin: 12px auto 0;
+  }
+
+  .tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: rgba(18, 14, 28, 0.94);
+    border: 1px solid rgba(245, 222, 179, 0.25);
+    border-radius: 6px;
+    padding: 9px 14px;
+    font-size: 13px;
+    font-weight: 400;
+    color: #e8e4d9;
+    line-height: 1.5;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 100;
+    backdrop-filter: blur(6px);
+    max-width: 260px;
+  }
+
+  .tooltip strong { color: #f5deb3; font-weight: 500; }
+
+  .legend {
+    font-size: 11px;
+    color: #8a7e6b;
+    text-align: center;
+    margin: 10px 0 22px;
+    letter-spacing: 0.08em;
+  }
+</style>
+</head>
+<body>
+
+<h1>
+  FIFA World Cup 2022
+  <span>Round of 16 — Chord Diagram · Ribbon width ∝ goals</span>
+</h1>
+
+<div id="chart"></div>
+<div class="tooltip" id="tooltip"></div>
+<p class="legend">Hover over arcs or ribbons to explore match details</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+(function () {
+
+  /* ─── DATA ──────────────────────────────────────────────────────── */
+  // Round of 16 teams (indices 0–15)
+  const teams = [
+    "Netherlands",   // 0
+    "USA",           // 1
+    "Argentina",     // 2
+    "Australia",     // 3
+    "France",        // 4
+    "Poland",        // 5
+    "England",       // 6
+    "Senegal",       // 7
+    "Japan",         // 8
+    "Croatia",       // 9
+    "Brazil",        // 10
+    "South Korea",   // 11
+    "Morocco",       // 12
+    "Spain",         // 13
+    "Portugal",      // 14
+    "Switzerland"    // 15
+  ];
+
+  const n = teams.length;
+
+  // Match results (goals by each team):
+  // Netherlands 3 – 1 USA
+  // Argentina 2 – 1 Australia
+  // France 3 – 1 Poland
+  // England 3 – 0 Senegal
+  // Japan 1(1) – 1(3) Croatia  → 1-1 in regular/ET; Croatia won pens
+  // Brazil 4 – 1 South Korea
+  // Morocco 0(3) – 0(0) Spain → 0-0; Morocco won pens
+  // Portugal 6 – 1 Switzerland
+
+  const matches = [
+    { i: 0,  j: 1,  goalsI: 3, goalsJ: 1, label: "Netherlands 3 – 1 USA" },
+    { i: 2,  j: 3,  goalsI: 2, goalsJ: 1, label: "Argentina 2 – 1 Australia" },
+    { i: 4,  j: 5,  goalsI: 3, goalsJ: 1, label: "France 3 – 1 Poland" },
+    { i: 6,  j: 7,  goalsI: 3, goalsJ: 0, label: "England 3 – 0 Senegal" },
+    { i: 8,  j: 9,  goalsI: 1, goalsJ: 1, label: "Japan 1 – 1 Croatia (Croatia win pens)" },
+    { i: 10, j: 11, goalsI: 4, goalsJ: 1, label: "Brazil 4 – 1 South Korea" },
+    { i: 12, j: 13, goalsI: 0, goalsJ: 0, label: "Morocco 0 – 0 Spain (Morocco win pens)" },
+    { i: 14, j: 15, goalsI: 6, goalsJ: 1, label: "Portugal 6 – 1 Switzerland" },
+  ];
+
+  // Build the n×n matrix.
+  // For 0-0 draws we use a small value (0.35) so the ribbon is still visible.
+  const matrix = Array.from({ length: n }, () => new Array(n).fill(0));
+  const MIN_FLOW = 0.35;
+
+  matches.forEach(m => {
+    matrix[m.i][m.j] = m.goalsI || MIN_FLOW;
+    matrix[m.j][m.i] = m.goalsJ || MIN_FLOW;
+  });
+
+  /* ─── COLORS ────────────────────────────────────────────────────── */
+  const teamColors = [
+    "#FF6B00", // Netherlands – orange
+    "#002868", // USA – navy
+    "#74ACDF", // Argentina – sky blue
+    "#FFCD00", // Australia – gold
+    "#002395", // France – blue
+    "#DC143C", // Poland – crimson
+    "#FFFFFF", // England – white
+    "#00853F", // Senegal – green
+    "#BC002D", // Japan – red
+    "#FF0000", // Croatia – red-white
+    "#009739", // Brazil – green
+    "#C60C30", // South Korea – red
+    "#C1272D", // Morocco – red
+    "#FFD700", // Spain – gold
+    "#006847", // Portugal – green
+    "#FF0000", // Switzerland – red
+  ];
+
+  /* ─── LAYOUT ────────────────────────────────────────────────────── */
+  const width = 780;
+  const height = 780;
+  const outerRadius = width / 2 - 100;
+  const innerRadius = outerRadius - 22;
+
+  const chord = d3.chord()
+    .padAngle(0.04)
+    .sortSubgroups(d3.descending)
+    .sortChords(d3.descending);
+
+  const arc = d3.arc()
+    .innerRadius(innerRadius)
+    .outerRadius(outerRadius);
+
+  const ribbon = d3.ribbon()
+    .radius(innerRadius - 2);
+
+  const svg = d3.select("#chart")
+    .append("svg")
+      .attr("viewBox", `0 0 ${width} ${height}`)
+      .attr("width", width)
+      .attr("height", height)
+    .append("g")
+      .attr("transform", `translate(${width / 2},${height / 2})`);
+
+  const chords = chord(matrix);
+
+  const tooltip = d3.select("#tooltip");
+
+  /* ─── ARCS (outer groups) ───────────────────────────────────────── */
+  const group = svg.append("g")
+    .selectAll("g")
+    .data(chords.groups)
+    .join("g");
+
+  group.append("path")
+    .attr("d", arc)
+    .attr("fill", d => teamColors[d.index])
+    .attr("stroke", "rgba(255,255,255,0.12)")
+    .attr("stroke-width", 0.5)
+    .style("cursor", "pointer")
+    .on("mouseover", function (event, d) {
+      // Dim all ribbons except those connected to this group
+      svg.selectAll(".ribbon")
+        .transition().duration(200)
+        .style("opacity", r =>
+          r.source.index === d.index || r.target.index === d.index ? 0.92 : 0.06
+        );
+
+      const matchInfo = matches.filter(m => m.i === d.index || m.j === d.index);
+      let html = `<strong>${teams[d.index]}</strong>`;
+      matchInfo.forEach(m => { html += `<br>${m.label}`; });
+
+      tooltip
+        .html(html)
+        .style("opacity", 1)
+        .style("left", (event.clientX + 14) + "px")
+        .style("top", (event.clientY - 10) + "px");
+    })
+    .on("mousemove", function (event) {
+      tooltip
+        .style("left", (event.clientX + 14) + "px")
+        .style("top", (event.clientY - 10) + "px");
+    })
+    .on("mouseout", function () {
+      svg.selectAll(".ribbon")
+        .transition().duration(300)
+        .style("opacity", 0.78);
+      tooltip.style("opacity", 0);
+    });
+
+  /* ─── LABELS ────────────────────────────────────────────────────── */
+  group.append("text")
+    .each(d => { d.angle = (d.startAngle + d.endAngle) / 2; })
+    .attr("dy", "0.35em")
+    .attr("transform", d =>
+      `rotate(${(d.angle * 180 / Math.PI - 90)})` +
+      `translate(${outerRadius + 14})` +
+      (d.angle > Math.PI ? "rotate(180)" : "")
+    )
+    .attr("text-anchor", d => d.angle > Math.PI ? "end" : "start")
+    .attr("fill", d => {
+      const c = d3.color(teamColors[d.index]);
+      // brighten dark colours for legibility
+      return c && c.l !== undefined ? teamColors[d.index]
+        : d3.hsl(teamColors[d.index]).l < 0.45
+          ? d3.hsl(teamColors[d.index]).brighter(1.4)
+          : teamColors[d.index];
+    })
+    .style("font-size", "12.5px")
+    .style("font-weight", 500)
+    .style("letter-spacing", "0.04em")
+    .text(d => teams[d.index]);
+
+  /* ─── RIBBONS (chords) ──────────────────────────────────────────── */
+  svg.append("g")
+    .selectAll("path")
+    .data(chords)
+    .join("path")
+      .attr("class", "ribbon")
+      .attr("d", ribbon)
+      .attr("fill", d => {
+        // Use the color of the team that scored more
+        const si = d.source.index;
+        const ti = d.target.index;
+        const match = matches.find(m =>
+          (m.i === si && m.j === ti) || (m.i === ti && m.j === si)
+        );
+        if (!match) return "#555";
+        const winIdx = match.goalsI >= match.goalsJ ? match.i : match.j;
+        return teamColors[winIdx];
+      })
+      .attr("fill-opacity", 0.78)
+      .attr("stroke", "rgba(255,255,255,0.06)")
+      .attr("stroke-width", 0.5)
+      .style("cursor", "pointer")
+      .style("mix-blend-mode", "screen")
+      .on("mouseover", function (event, d) {
+        d3.select(this).attr("fill-opacity", 1);
+        svg.selectAll(".ribbon")
+          .filter(r => r !== d)
+          .transition().duration(200)
+          .style("opacity", 0.08);
+
+        const si = d.source.index;
+        const ti = d.target.index;
+        const match = matches.find(m =>
+          (m.i === si && m.j === ti) || (m.i === ti && m.j === si)
+        );
+
+        tooltip
+          .html(match ? `<strong>${match.label}</strong><br>Total goals: ${match.goalsI + match.goalsJ}` : "")
+          .style("opacity", 1)
+          .style("left", (event.clientX + 14) + "px")
+          .style("top", (event.clientY - 10) + "px");
+      })
+      .on("mousemove", function (event) {
+        tooltip
+          .style("left", (event.clientX + 14) + "px")
+          .style("top", (event.clientY - 10) + "px");
+      })
+      .on("mouseout", function () {
+        d3.select(this).attr("fill-opacity", 0.78);
+        svg.selectAll(".ribbon")
+          .transition().duration(300)
+          .style("opacity", 0.78);
+        tooltip.style("opacity", 0);
+      });
+
+})();
+</script>
+</body>
+</html>
