@@ -1,0 +1,1935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Venice Artists Interactive Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        /* ==================== GLOBAL STYLES ==================== */
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            min-height: 100vh;
+        }
+
+        /* ==================== LAYOUT STYLES ==================== */
+        .dashboard {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+        }
+
+        .network-container, .timeline-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+        }
+
+        .network-container {
+            height: 500px;
+        }
+
+        .timeline-container {
+            height: 200px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-align: center;
+            color: #66ccff;
+        }
+
+        /* ==================== LEGEND STYLES ==================== */
+        .color-legend {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            z-index: 1000;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .legend-symbol {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border: 2px solid white;
+        }
+
+        .legend-artist {
+            background: #ff4444;
+            transform: rotate(45deg);
+        }
+
+        .legend-city {
+            background: #4444ff;
+            clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+        }
+
+        /* ==================== TOOLTIP STYLES ==================== */
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            pointer-events: auto;
+            z-index: 1000;
+            max-width: 250px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+        }
+
+        .tooltip a {
+            color: #66ccff;
+            text-decoration: none;
+            display: block;
+            margin-top: 8px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: rgba(102, 204, 255, 0.1);
+            transition: background 0.2s ease;
+        }
+
+        .tooltip a:hover {
+            text-decoration: underline;
+            background: rgba(102, 204, 255, 0.2);
+        }
+
+        /* ==================== NETWORK GRAPH STYLES ==================== */
+        .network-node {
+            cursor: pointer;
+            stroke: white;
+            stroke-width: 2;
+            transition: opacity 0.3s ease;
+        }
+
+        .network-link {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.4);
+            stroke-width: 2;
+            transition: opacity 0.3s ease;
+        }
+
+        .node-label {
+            fill: white;
+            font-size: 11px;
+            text-anchor: middle;
+            pointer-events: none;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+            transition: opacity 0.3s ease;
+        }
+
+
+	/* ==================== ZOOM CONTROLS STYLES ==================== */
+.network-controls {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    gap: 10px;
+    z-index: 999;
+}
+
+.zoom-button {
+    background: rgba(102, 204, 255, 0.2);
+    border: 1px solid rgba(102, 204, 255, 0.5);
+    color: #66ccff;
+    padding: 10px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.zoom-button:hover {
+    background: rgba(102, 204, 255, 0.4);
+    border-color: rgba(102, 204, 255, 0.8);
+    transform: scale(1.05);
+}
+
+.zoom-button:active {
+    transform: scale(0.95);
+}
+
+
+/* ==================== PANNING STYLES ==================== */
+.network-svg-wrapper {
+    cursor: grab;
+    overflow: hidden;
+}
+
+.network-svg-wrapper.panning {
+    cursor: grabbing;
+}
+
+	/* ==================== SIDE MENU STYLES ==================== */
+.side-menu-button {
+    position: fixed;
+    left: 20px;
+    top: 20px;
+    z-index: 2000;
+    background: rgba(102, 204, 255, 0.2);
+    border: 2px solid rgba(102, 204, 255, 0.6);
+    color: #66ccff;
+    padding: 12px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+.side-menu-button:hover {
+    background: rgba(102, 204, 255, 0.4);
+    border-color: #66ccff;
+    transform: scale(1.05);
+}
+
+/* ==================== SEARCH BOX STYLES ==================== */
+.search-container {
+    position: fixed;
+    left: 20px;
+    top: 70px;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.search-box {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(102, 204, 255, 0.4);
+    color: white;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    width: 220px;
+    transition: all 0.3s ease;
+}
+
+.search-box:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(102, 204, 255, 0.8);
+    box-shadow: 0 0 12px rgba(102, 204, 255, 0.3);
+}
+
+.search-box::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.search-clear-btn {
+    background: rgba(255, 68, 68, 0.2);
+    border: 1px solid rgba(255, 68, 68, 0.4);
+    color: #ff4444;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s ease;
+    display: none;
+}
+
+.search-clear-btn.show {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.search-clear-btn:hover {
+    background: rgba(255, 68, 68, 0.4);
+    border-color: #ff4444;
+}
+
+.search-results-count {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 12px;
+    min-width: 80px;
+    text-align: center;
+}
+
+/* ==================== TIMELINE TOGGLE STYLES ==================== */
+.timeline-toggle-btn {
+    position: fixed;
+    right: 20px;
+    top: 20px;
+    z-index: 2000;
+    background: rgba(102, 204, 255, 0.2);
+    border: 2px solid rgba(102, 204, 255, 0.6);
+    color: #66ccff;
+    padding: 12px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+.timeline-toggle-btn:hover {
+    background: rgba(102, 204, 255, 0.4);
+    border-color: #66ccff;
+    transform: scale(1.05);
+}
+
+.timeline-toggle-btn.hidden {
+    background: rgba(255, 150, 100, 0.2);
+    border-color: rgba(255, 150, 100, 0.6);
+    color: #ffaa66;
+}
+
+.timeline-toggle-btn.hidden:hover {
+    background: rgba(255, 150, 100, 0.4);
+    border-color: #ffaa66;
+}
+
+/* ==================== TIMELINE VISIBILITY STYLES ==================== */
+.timeline-container {
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.timeline-container.hidden {
+    height: 0;
+    opacity: 0;
+    padding: 0;
+    border: none;
+    margin: 0;
+    overflow: hidden;
+}
+
+.dashboard {
+    transition: gap 0.3s ease;
+}
+
+
+	/* ==================== OVERLAY STYLES ==================== */
+.overlay-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 1500;
+}
+
+.overlay-backdrop.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.side-menu-overlay {
+    position: fixed;
+    right: 0;
+    top: 0;
+    height: 100%;
+    width: 50vw;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 1600;
+    display: flex;
+    flex-direction: column;
+    border-left: 2px solid rgba(102, 204, 255, 0.3);
+    overflow-y: auto;
+}
+
+.side-menu-overlay.active {
+    transform: translateX(0);
+}
+
+.overlay-close-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 68, 68, 0.3);
+    border: 2px solid rgba(255, 68, 68, 0.6);
+    color: #ff4444;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    z-index: 1700;
+}
+
+.overlay-close-btn:hover {
+    background: rgba(255, 68, 68, 0.5);
+    border-color: #ff4444;
+    transform: scale(1.1);
+}
+
+.overlay-content {
+    padding: 40px 30px;
+}
+
+.overlay-title {
+    font-size: 24px;
+    font-weight: bold;
+    color: #66ccff;
+    margin-bottom: 30px;
+    margin-top: 20px;
+}
+
+.article-options {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.article-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(102, 204, 255, 0.3);
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.article-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(102, 204, 255, 0.6);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(102, 204, 255, 0.15);
+}
+
+.article-hero {
+    width: 100%;
+    height: 180px;
+    background: linear-gradient(135deg, #4444ff, #2222aa);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 60px;
+    color: white;
+    font-weight: bold;
+    overflow: hidden;
+}
+
+.article-hero.hero-1 {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+}
+
+.article-hero.hero-2 {
+    background: linear-gradient(135deg, #4ecdc4, #44a8a0);
+}
+
+.article-info {
+    padding: 20px;
+}
+
+.article-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: white;
+    margin-bottom: 8px;
+}
+
+.article-description {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.5;
+    margin-bottom: 12px;
+}
+
+.article-read-btn {
+    background: rgba(102, 204, 255, 0.2);
+    border: 1px solid rgba(102, 204, 255, 0.5);
+    color: #66ccff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    transition: all 0.2s ease;
+}
+
+.article-read-btn:hover {
+    background: rgba(102, 204, 255, 0.4);
+    border-color: #66ccff;
+}
+
+/* ==================== ARTICLE VIEWER STYLES ==================== */
+.article-viewer {
+    display: none;
+}
+
+.article-viewer.active {
+    display: block;
+}
+
+.article-back-btn {
+    background: rgba(102, 204, 255, 0.2);
+    border: 1px solid rgba(102, 204, 255, 0.5);
+    color: #66ccff;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    transition: all 0.2s ease;
+    align-self: flex-start;
+}
+
+.article-back-btn:hover {
+    background: rgba(102, 204, 255, 0.4);
+    border-color: #66ccff;
+}
+
+.article-full-hero {
+    width: 100%;
+    height: 250px;
+    background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 80px;
+    color: white;
+    font-weight: bold;
+    margin-bottom: 30px;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.article-full-hero.hero-1 {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+}
+
+.article-full-hero.hero-2 {
+    background: linear-gradient(135deg, #4ecdc4, #44a8a0);
+}
+
+.article-full-title {
+    font-size: 28px;
+    font-weight: bold;
+    color: #66ccff;
+    margin-bottom: 15px;
+}
+
+.article-full-meta {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 20px;
+}
+
+.article-full-body {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.85);
+    line-height: 1.8;
+    margin-bottom: 20px;
+}
+
+.article-full-body p {
+    margin-bottom: 15px;
+}
+
+
+
+
+        /* ==================== TIMELINE STYLES ==================== */
+        .timeline-axis {
+            stroke: white;
+            stroke-width: 2;
+        }
+
+        .timeline-tick {
+            stroke: rgba(255, 255, 255, 0.6);
+            stroke-width: 1;
+        }
+
+        .timeline-label {
+            fill: white;
+            font-size: 10px;
+            text-anchor: middle;
+        }
+
+        .timeline-node {
+            cursor: pointer;
+            stroke: white;
+            stroke-width: 2;
+            transition: opacity 0.3s ease;
+        }
+
+        .timeline-arc {
+            fill: none;
+            stroke: #ff4444;
+            stroke-width: 3;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .timeline-node-label {
+            fill: white;
+            font-size: 9px;
+            text-anchor: middle;
+            pointer-events: none;
+            font-weight: bold;
+            transition: opacity 0.3s ease;
+        }
+
+        /* ==================== RESPONSIVE STYLES ==================== */
+        @media (max-width: 768px) {
+            .dashboard {
+                padding: 10px;
+                gap: 20px;
+            }
+            
+            .network-container {
+                height: 400px;
+            }
+            
+            .color-legend {
+                font-size: 10px;
+                padding: 10px;
+            }
+
+            .network-controls {
+                bottom: 10px;
+                right: 10px;
+            }
+
+            .zoom-button {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+	    
+		.side-menu-overlay {
+        width: 100vw;
+    }
+    
+    .overlay-content {
+        padding: 20px 20px;
+    }
+    
+    .overlay-title {
+        font-size: 20px;
+    }
+    
+    .search-container {
+        left: 10px;
+        top: 70px;
+        width: calc(100% - 20px);
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .search-box {
+        width: 100%;
+    }
+    
+    .timeline-toggle-btn {
+        right: 10px;
+        top: 140px;
+    }
+
+
+
+        }
+    </style>
+</head>
+
+
+
+
+
+
+<body>
+
+    <!-- Side Menu Button -->
+<button class="side-menu-button" id="side-menu-toggle">≡ Menu</button>
+
+	<!-- Search Container -->
+<div class="search-container">
+    <input 
+        type="text" 
+        class="search-box" 
+        id="search-box" 
+        placeholder="Search artists or cities..."
+    >
+    <button class="search-clear-btn" id="search-clear-btn">✕</button>
+    <div class="search-results-count" id="search-results-count"></div>
+</div>
+
+<!-- Timeline Toggle Button -->
+<button class="timeline-toggle-btn" id="timeline-toggle-btn">📊 Timeline</button>
+
+
+<!-- Overlay Backdrop -->
+<div class="overlay-backdrop" id="overlay-backdrop"></div>
+
+<!-- Side Menu Overlay -->
+<div class="side-menu-overlay" id="side-menu-overlay">
+    <button class="overlay-close-btn" id="overlay-close">×</button>
+    
+    <!-- Articles Selection -->
+    <div id="articles-selection" class="articles-selection">
+        <div class="overlay-content">
+            <div class="overlay-title">Featured Articles</div>
+            
+            <div class="article-options">
+                <!-- Article 1 -->
+                <div class="article-card" data-article="1">
+                    <div class="article-hero hero-1">📚</div>
+                    <div class="article-info">
+                        <div class="article-title">Venice: A Maritime Republic</div>
+                        <div class="article-description">Explore the history and cultural significance of Venice during the Renaissance period and its influence on European art and trade.</div>
+                        <button class="article-read-btn">Read Article</button>
+                    </div>
+                </div>
+                
+                <!-- Article 2 -->
+                <div class="article-card" data-article="2">
+                    <div class="article-hero hero-2">🎨</div>
+                    <div class="article-info">
+                        <div class="article-title">Renaissance Masters of Venice</div>
+                        <div class="article-description">Discover the works and lives of Veronese, Tintoretto, and other legendary Venetian artists who shaped the Renaissance.</div>
+                        <button class="article-read-btn">Read Article</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Article Viewer -->
+    <div id="article-viewer" class="article-viewer">
+        <div class="overlay-content">
+            <button class="article-back-btn" id="article-back-btn">← Back to Articles</button>
+            
+            <!-- Article 1 Content -->
+            <div id="article-1-content" class="article-content">
+                <div class="article-full-hero hero-1">📚</div>
+                <h1 class="article-full-title">Venice: A Maritime Republic</h1>
+                <div class="article-full-meta">Published on Renaissance History | 8 min read</div>
+                
+                <div class="article-full-body">
+                    <p>Venice, known as "La Serenissima" (The Most Serene Republic), stands as one of history's most remarkable city-states. From the 9th century onwards, Venice transformed from a humble lagoon settlement into a powerful maritime republic that dominated Mediterranean trade for centuries.</p>
+                    
+                    <p>The unique geography of Venice—built on islands in a lagoon—forced its inhabitants to become master navigators and traders. By the 11th century, Venetian merchants had established trade routes that reached Egypt, the Levant, and beyond. This maritime prowess brought immense wealth and cultural exchange to the city.</p>
+                    
+                    <p>During the Renaissance (14th-16th centuries), Venice reached its zenith as a center of art, culture, and politics. The city's wealth enabled the patronage of some of the greatest artists of the age, including painters, sculptors, and architects. The famous Venetian school of painting emerged during this period, characterized by its use of bold colors and dramatic compositions.</p>
+                    
+                    <p>The population of Venice in the 16th century reached approximately 30,000 inhabitants, making it one of the largest European cities at the time. This dense, cosmopolitan population created a vibrant intellectual and artistic atmosphere.</p>
+                    
+                    <p>Although Venice's political power declined after the 17th century, its cultural legacy remains unmatched. The city continues to inspire artists, writers, and scholars with its architectural beauty, artistic treasures, and romantic canals.</p>
+                </div>
+            </div>
+            
+            <!-- Article 2 Content -->
+            <div id="article-2-content" class="article-content" style="display: none;">
+                <div class="article-full-hero hero-2">🎨</div>
+                <h1 class="article-full-title">Renaissance Masters of Venice</h1>
+                <div class="article-full-meta">Published on Art History | 10 min read</div>
+                
+                <div class="article-full-body">
+                    <p>The Venetian Renaissance produced some of history's greatest artists. The favorable economic conditions, coupled with the city's unique cultural position between East and West, fostered an environment where artistic innovation flourished.</p>
+                    
+                    <p><strong>Paolo Veronese (1528-1588)</strong> was renowned for his grand narrative paintings and masterful use of color. His works often depicted elaborate scenes of Venetian life and biblical stories. Veronese's paintings are characterized by their sumptuous color palettes and dramatic compositions that fill entire walls of Venetian palaces and churches.</p>
+                    
+                    <p><strong>Tintoretto (1518-1594)</strong> brought a more dynamic and emotional approach to painting. His dramatic use of perspective and light created a sense of movement and urgency in his works. Tintoretto's prolific output—he produced hundreds of paintings—made him one of the most influential artists of the era.</p>
+                    
+                    <p><strong>Jacopo Bassano (1510-1592)</strong> developed a unique style that combined mythological subjects with rural landscapes. His innovative approach to composition and his ability to capture light influenced many subsequent artists.</p>
+                    
+                    <p><strong>Andrea Palladio (1508-1580)</strong>, while primarily known as an architect, contributed significantly to the Renaissance aesthetic. His classical principles and harmonious proportions defined Renaissance architecture and continue to influence architects today.</p>
+                    
+                    <p>These masters worked in an environment of intense competition and collaboration. Patrons from wealthy merchant families and the church commissioned elaborate works, pushing artists to ever greater heights of creativity. The result was a body of work that defined the Renaissance and continues to captivate audiences centuries later.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+    <div class="dashboard">
+        <!-- ==================== NETWORK SECTION ==================== -->
+        	<div class="network-container">
+    <div class="section-title">Venice Artists Network</div>
+    <div class="color-legend">
+        <div class="legend-item">
+            <div class="legend-symbol legend-artist"></div>
+            <span>Artists</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-symbol legend-city"></div>
+            <span>Cities</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-symbol" style="background: rgba(255, 200, 100, 0.7); border-radius: 50%;"></div>
+            <span>City Populations</span>
+        </div>
+    </div>
+    <div class="network-controls">
+        <button class="zoom-button" id="zoom-in-btn" title="Zoom In">+ Zoom In</button>
+        <button class="zoom-button" id="zoom-out-btn" title="Zoom Out">- Zoom Out</button>
+    </div>
+    <div class="network-svg-wrapper">
+        <svg id="network-svg"></svg>
+    </div>
+</div>
+ 
+        <!-- ==================== TIMELINE SECTION ==================== -->
+        <div class="timeline-container">
+            <div class="section-title">Timeline (1400-1600)</div>
+            <svg id="timeline-svg"></svg>
+        </div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+
+
+
+
+    <script>
+        // ==================== CONFIGURATION PARAMETERS ====================
+        const CONFIG = {
+            // Network Graph Configuration
+            network: {
+                nodeColors: {
+                    artist: '#ff4444',
+                    city: '#4444ff'
+                },
+                nodeSize: {
+                    artist: 15,
+                    city: 18
+                },
+                linkDistance: 100,
+                chargeStrength: -300,
+                labelOffset: 35
+            },
+            
+            // Timeline Configuration
+            timeline: {
+                yearRange: [1400, 1600],
+                tickYears: [1400, 1425, 1450, 1475, 1500, 1525, 1550, 1575, 1600],
+                nodeRadius: 6,
+                squareSize: 12,
+                arcOffset: 40,
+                arcControlOffset: 20,
+                margin: { left: 50, right: 50 }
+            },
+            
+            // Visual Effects
+            effects: {
+                selectedOpacity: 1.0,
+                deselectedOpacity: 0.3,
+                linkDeselectedOpacity: 0.1,
+                transitionDuration: 300
+            }
+        };
+
+        // ==================== DATA DEFINITIONS ====================
+        const NODES_DATA = [
+            {
+                name: "Veronese",
+                type: "artist",
+                birth: "b. 1528",
+                death: "d. 1588",
+                "main discipline": "painter",
+                value: "0.5",
+                link: "https://en.wikipedia.org/wiki/Paolo_Veronese",
+                birthYear: 1528,
+                deathYear: 1588
+            },
+            {
+                name: "Tintoretto",
+                type: "artist",
+                birth: "b. 1518",
+                death: "d. 1594",
+                "main discipline": "painter",
+                value: "0.5",
+                link: "https://en.wikipedia.org/wiki/Tintoretto",
+                birthYear: 1518,
+                deathYear: 1594
+            },
+            {
+                name: "VENICE",
+                type: "city",
+                birth: "city state",
+                death: "(Veneto)",
+                "main discipline": "Republic of Venice (La Serenissima)",
+                link: "https://en.wikipedia.org/wiki/Republic_of_Venice",
+                value: "5",
+		population: 30000
+            },
+            {
+                name: "Bassano",
+                type: "artist",
+                birth: "b. 1510",
+                death: "d. 1592",
+                "main discipline": "painter",
+                value: "0.5",
+                link: "https://en.wikipedia.org/wiki/Jacopo_Bassano",
+                birthYear: 1510,
+                deathYear: 1592
+            },
+            {
+                name: "Palladio",
+                type: "artist",
+                birth: "b. 1508",
+                death: "d. 1580",
+                "main discipline": "architect",
+                value: "0.5",
+                link: "https://en.wikipedia.org/wiki/Andrea_Palladio",
+                birthYear: 1508,
+                deathYear: 1580
+            }
+        ];
+
+        const LINKS_DATA = [
+            { city: "VENICE", artists: "Bassano" },
+            { city: "VENICE", artists: "Veronese" },
+            { city: "VENICE", artists: "Palladio" },
+            { city: "VENICE", artists: "Tintoretto" }
+        ];
+
+	const CITIES_DATA = [
+    		{
+        	name: "VENICE",
+        	population: 30000
+    		}
+	];
+
+
+        // ==================== GLOBAL STATE ====================
+        let selectedNode = null;
+        let networkDimensions = {};
+        let timelineDimensions = {};
+        let tooltipVisible = false;
+        let currentTooltipNode = null;
+
+        // ==================== UTILITY FUNCTIONS ====================
+        
+        /**
+         * Convert links data to proper network format
+         */
+        function processLinksData(linksData) {
+            return linksData.map(link => ({
+                source: link.city,
+                target: link.artists
+            }));
+        }
+
+        /**
+         * Create timeline nodes from artist data
+         */
+        function createTimelineNodes(nodesData) {
+            const artistNodes = nodesData.filter(d => d.type === "artist" && d.birthYear);
+            const timelineNodes = [];
+            const timelineArcs = [];
+
+            artistNodes.forEach(artist => {
+                // Birth node (circle)
+                timelineNodes.push({
+                    ...artist,
+                    year: artist.birthYear,
+                    nodeType: "birth",
+                    id: `${artist.name}-birth`
+                });
+                
+                // Death node (square)
+                timelineNodes.push({
+                    ...artist,
+                    year: artist.deathYear,
+                    nodeType: "death",
+                    id: `${artist.name}-death`
+                });
+
+                // Arc data
+                timelineArcs.push({
+                    ...artist,
+                    startYear: artist.birthYear,
+                    endYear: artist.deathYear,
+                    id: `${artist.name}-arc`
+                });
+            });
+
+            return { timelineNodes, timelineArcs };
+        }
+
+        /**
+         * Generate node path based on type
+         */
+        function generateNodePath(nodeData) {
+            if (nodeData.type === "artist") {
+                // Diamond/rhombus shape
+                const size = CONFIG.network.nodeSize.artist;
+                return `M 0,-${size} L ${size},0 L 0,${size} L -${size},0 Z`;
+            } else {
+                // Octagon shape
+                const size = CONFIG.network.nodeSize.city;
+                const angle = Math.PI / 4;
+                let path = "M ";
+                for (let i = 0; i < 8; i++) {
+                    const x = size * Math.cos(i * angle);
+                    const y = size * Math.sin(i * angle);
+                    path += (i === 0 ? "" : "L ") + x + "," + y + " ";
+                }
+                path += "Z";
+                return path;
+            }
+        }
+
+        // ==================== DIMENSION MANAGEMENT ====================
+        
+        /**
+         * Update network graph dimensions
+         */
+        function updateNetworkDimensions() {
+            const container = d3.select(".network-container");
+            const containerRect = container.node().getBoundingClientRect();
+            
+            networkDimensions = {
+                width: containerRect.width - 40,
+                height: containerRect.height - 60
+            };
+            
+            d3.select("#network-svg")
+                .attr("width", networkDimensions.width)
+                .attr("height", networkDimensions.height);
+                
+            return networkDimensions;
+        }
+
+        /**
+         * Update timeline dimensions
+         */
+        function updateTimelineDimensions() {
+            const container = d3.select(".timeline-container");
+            const containerRect = container.node().getBoundingClientRect();
+            
+            timelineDimensions = {
+                width: containerRect.width - 40,
+                height: containerRect.height - 60
+            };
+            
+            d3.select("#timeline-svg")
+                .attr("width", timelineDimensions.width)
+                .attr("height", timelineDimensions.height);
+                
+            return timelineDimensions;
+        }
+
+        // ==================== TOOLTIP MANAGEMENT ====================
+        
+        /**
+         * Show persistent tooltip with node information
+         */
+        function showPersistentTooltip(event, nodeData) {
+            const tooltip = d3.select("#tooltip");
+            
+            const tooltipContent = `
+                <strong>${nodeData.name}</strong><br>
+                ${nodeData.type}, ${nodeData.birth}, ${nodeData.death}<br>
+                ${nodeData["main discipline"]}
+                <a href="${nodeData.link}" target="_blank" rel="noopener noreferrer">More info</a>
+            `;
+            
+            tooltip
+                .classed("visible", true)
+                .html(tooltipContent)
+                .style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY - 10) + "px");
+                
+            tooltipVisible = true;
+            currentTooltipNode = nodeData.name;
+        }
+
+        /**
+         * Show temporary tooltip on hover (only if no persistent tooltip is visible)
+         */
+        function showTooltip(event, nodeData) {
+            if (!tooltipVisible) {
+                const tooltip = d3.select("#tooltip");
+                
+                const tooltipContent = `
+                    <strong>${nodeData.name}</strong><br>
+                    ${nodeData.type}, ${nodeData.birth}, ${nodeData.death}<br>
+                    ${nodeData["main discipline"]}
+                    <a href="${nodeData.link}" target="_blank" rel="noopener noreferrer">More info</a>
+                `;
+                
+                tooltip
+                    .style("opacity", 1)
+                    .html(tooltipContent)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 10) + "px");
+            }
+        }
+
+        /**
+         * Hide temporary tooltip (only if no persistent tooltip is visible)
+         */
+        function hideTooltip() {
+            if (!tooltipVisible) {
+                d3.select("#tooltip").style("opacity", 0);
+            }
+        }
+
+        /**
+         * Hide persistent tooltip
+         */
+        function hidePersistentTooltip() {
+            const tooltip = d3.select("#tooltip");
+            tooltip
+                .classed("visible", false)
+                .style("opacity", 0);
+                
+            tooltipVisible = false;
+            currentTooltipNode = null;
+        }
+
+        /**
+         * Handle clicks outside tooltip to close it
+         */
+        function handleDocumentClick(event) {
+            const tooltip = document.getElementById("tooltip");
+            const clickedElement = event.target;
+            
+            // Check if click is outside tooltip and not on a node
+            if (tooltipVisible && 
+                !tooltip.contains(clickedElement) && 
+                !clickedElement.closest('.network-node') && 
+                !clickedElement.closest('.timeline-node')) {
+                hidePersistentTooltip();
+            }
+        }
+
+        // ==================== INTERACTION HANDLERS ====================
+        
+        /**
+         * Handle node selection and show persistent tooltip
+         */
+        function selectNode(nodeName, event, nodeData) {
+            selectedNode = nodeName;
+            updateNodeOpacity();
+            updateTimelineOpacity();
+            
+                // Show persistent tooltip if nodeData is provided and not from search
+    if (nodeData && event) {
+        showPersistentTooltip(event, nodeData);
+    } else if (nodeData && !event) {
+        // From search - don't show tooltip, just highlight
+    }
+        }
+
+        /**
+         * Get connected nodes for a given node name
+         */
+        function getConnectedNodes(nodeName) {
+            const connectedNodes = new Set([nodeName]); // Include the selected node itself
+            
+            // Find all nodes connected to the selected node
+            const networkLinks = processLinksData(LINKS_DATA);
+            networkLinks.forEach(link => {
+                if (link.source === nodeName) {
+                    connectedNodes.add(link.target);
+                } else if (link.target === nodeName) {
+                    connectedNodes.add(link.source);
+                }
+            });
+            
+            return connectedNodes;
+        }
+
+        /**
+         * Update network node opacity based on selection
+         */
+        function updateNodeOpacity() {
+            const { selectedOpacity, deselectedOpacity, linkDeselectedOpacity } = CONFIG.effects;
+            
+            // Get all connected nodes
+            const connectedNodes = getConnectedNodes(selectedNode);
+            
+            // Update network nodes - highlight selected node and all connected nodes
+            d3.selectAll(".network-node")
+                .style("opacity", d => connectedNodes.has(d.name) ? selectedOpacity : deselectedOpacity);
+            
+            d3.selectAll(".node-label")
+                .style("opacity", d => connectedNodes.has(d.name) ? selectedOpacity : deselectedOpacity);
+            
+            // Update network links - highlight links connected to selected node
+            d3.selectAll(".network-link")
+                .style("opacity", d => 
+                    d.source.name === selectedNode || d.target.name === selectedNode ? 
+                    selectedOpacity : linkDeselectedOpacity);
+        }
+
+        /**
+         * Update timeline opacity and show arcs
+         */
+        function updateTimelineOpacity() {
+            const { selectedOpacity, deselectedOpacity } = CONFIG.effects;
+            
+            // Update timeline nodes
+            d3.selectAll(".timeline-node")
+                .style("opacity", d => d.name === selectedNode ? selectedOpacity : deselectedOpacity);
+            
+            d3.selectAll(".timeline-node-label")
+                .style("opacity", d => d.name === selectedNode ? selectedOpacity : deselectedOpacity);
+            
+            // Show/hide timeline arcs
+            d3.selectAll(".timeline-arc")
+                .style("opacity", d => d.name === selectedNode ? selectedOpacity : 0);
+        }
+
+
+/**
+ * Apply zoom transformation to network graph
+ */
+// ==================== ZOOM & PAN MANAGEMENT ====================
+
+let currentZoomLevel = 1;
+const ZOOM_STEP = 0.2;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 3;
+let isPanning = false;
+let panStartX = 0;
+let panStartY = 0;
+let panOffsetX = 0;
+let panOffsetY = 0;
+let networkGroup = null;
+
+/**
+ * Apply combined zoom and pan transformation
+ */
+function applyTransform() {
+    if (!networkGroup) return;
+    
+    const { width, height } = networkDimensions;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    
+    const transformString = `
+        translate(${centerX}, ${centerY})
+        translate(${panOffsetX}, ${panOffsetY})
+        scale(${currentZoomLevel})
+        translate(-${centerX}, -${centerY})
+    `;
+    
+    networkGroup.attr("transform", transformString);
+}
+
+/**
+ * Apply zoom transformation to network graph
+ */
+function applyZoom(zoomLevel) {
+    currentZoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomLevel));
+    applyTransform();
+}
+
+/**
+ * Zoom in handler
+ */
+function handleZoomIn() {
+    const newZoomLevel = currentZoomLevel + ZOOM_STEP;
+    applyZoom(newZoomLevel);
+}
+
+/**
+ * Zoom out handler
+ */
+function handleZoomOut() {
+    const newZoomLevel = currentZoomLevel - ZOOM_STEP;
+    applyZoom(newZoomLevel);
+}
+
+/**
+ * Handle panning start
+ */
+function handlePanStart(event) {
+    if (event.button !== 0) return;
+    if (event.target.closest('.zoom-button')) return;
+    if (event.target.closest('.network-node')) return;
+    
+    isPanning = true;
+    panStartX = event.clientX;
+    panStartY = event.clientY;
+    
+    d3.select('.network-svg-wrapper').classed('panning', true);
+}
+
+/**
+ * Handle panning movement
+ */
+function handlePanMove(event) {
+    if (!isPanning) return;
+    
+    const deltaX = event.clientX - panStartX;
+    const deltaY = event.clientY - panStartY;
+    
+    panOffsetX += deltaX;
+    panOffsetY += deltaY;
+    
+    panStartX = event.clientX;
+    panStartY = event.clientY;
+    
+    applyTransform();
+}
+
+/**
+ * Handle panning end
+ */
+function handlePanEnd() {
+    isPanning = false;
+    d3.select('.network-svg-wrapper').classed('panning', false);
+}
+
+
+
+
+
+
+
+
+        // ==================== DRAG BEHAVIOR ====================
+        
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+
+        // ==================== NETWORK GRAPH INITIALIZATION ====================
+        
+        /**
+         * Initialize network graph
+         */
+        function initializeNetworkGraph() {
+            updateNetworkDimensions();
+            
+            const networkLinks = processLinksData(LINKS_DATA);
+            const networkSvg = d3.select("#network-svg");
+            
+            // Create simulation
+            window.simulation = d3.forceSimulation(NODES_DATA)
+                .force("link", d3.forceLink(networkLinks).id(d => d.name).distance(CONFIG.network.linkDistance))
+                .force("charge", d3.forceManyBody().strength(CONFIG.network.chargeStrength))
+                .force("center", d3.forceCenter(networkDimensions.width / 2, networkDimensions.height / 2));
+
+            // Create network group
+            // Create network group (store as global for pan/zoom)
+networkGroup = networkSvg.append("g").attr("class", "network-group");
+
+// Create background layer for city population circles
+const backgroundLayer = networkGroup.append("g").attr("class", "city-layer");
+
+// Add city population circles
+const cityCircles = backgroundLayer.selectAll(".city-circle")
+    .data(CITIES_DATA)
+    .join("circle")
+    .attr("class", "city-circle")
+    .attr("cx", d => {
+        const cityNode = NODES_DATA.find(n => n.name === d.name);
+        return cityNode ? cityNode.x || networkWidth / 2 : networkWidth / 2;
+    })
+    .attr("cy", d => {
+        const cityNode = NODES_DATA.find(n => n.name === d.name);
+        return cityNode ? cityNode.y || networkHeight / 2 : networkHeight / 2;
+    })
+    .attr("r", d => {
+        const maxRadius = 150;
+        const minRadius = 50;
+        const populationScale = Math.sqrt(d.population / 10000);
+        return Math.max(minRadius, Math.min(maxRadius, populationScale * 40));
+    })
+    .attr("fill", "rgba(255, 200, 100, 0.15)")
+    .attr("stroke", "rgba(255, 180, 80, 0.4)")
+    .attr("stroke-width", 2);
+
+// Add city population label
+backgroundLayer.selectAll(".city-pop-label")
+    .data(CITIES_DATA)
+    .join("text")
+    .attr("class", "city-pop-label")
+    .attr("x", d => {
+        const cityNode = NODES_DATA.find(n => n.name === d.name);
+        return cityNode ? cityNode.x || networkWidth / 2 : networkWidth / 2;
+    })
+    .attr("y", d => {
+        const cityNode = NODES_DATA.find(n => n.name === d.name);
+        return cityNode ? cityNode.y + 20 || networkHeight / 2 + 20 : networkHeight / 2 + 20;
+    })
+    .attr("text-anchor", "middle")
+    .attr("fill", "rgba(255, 180, 80, 0.8)")
+    .attr("font-size", "12px")
+    .attr("font-weight", "bold")
+    .attr("pointer-events", "none")
+    .text(d => `Population: ${d.population.toLocaleString()}`);
+
+
+            // Create links
+            const links = networkGroup.append("g")
+                .selectAll("path")
+                .data(networkLinks)
+                .join("path")
+                .attr("class", "network-link");
+
+            // Create nodes
+            const nodes = networkGroup.append("g")
+                .selectAll("path")
+                .data(NODES_DATA)
+                .join("path")
+                .attr("class", "network-node")
+                .attr("fill", d => CONFIG.network.nodeColors[d.type])
+                .attr("d", generateNodePath)
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended))
+                .on("click", (event, d) => {
+                    event.stopPropagation();
+                    selectNode(d.name, event, d);
+                })
+                .on("mouseover", showTooltip)
+                .on("mouseout", hideTooltip);
+
+            // Create node labels
+            const nodeLabels = networkGroup.append("g")
+                .selectAll("text")
+                .data(NODES_DATA)
+                .join("text")
+                .attr("class", "node-label")
+                .text(d => d.name)
+                .attr("dy", CONFIG.network.labelOffset);
+
+            // Simulation tick function
+            simulation.on("tick", () => {
+                links.attr("d", d => {
+                    const dx = d.target.x - d.source.x;
+                    const dy = d.target.y - d.source.y;
+                    const dr = Math.sqrt(dx * dx + dy * dy) * 2;
+                    return `M ${d.source.x},${d.source.y} A ${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
+                });
+
+                nodes.attr("transform", d => `translate(${d.x},${d.y})`);
+                nodeLabels.attr("transform", d => `translate(${d.x},${d.y})`);
+
+
+
+		// Update city circles and labels
+    cityCircles
+        .attr("cx", d => {
+            const cityNode = NODES_DATA.find(n => n.name === d.name);
+            return cityNode ? cityNode.x : networkWidth / 2;
+        })
+        .attr("cy", d => {
+            const cityNode = NODES_DATA.find(n => n.name === d.name);
+            return cityNode ? cityNode.y : networkHeight / 2;
+        });
+        
+    backgroundLayer.selectAll(".city-pop-label")
+        .attr("x", d => {
+            const cityNode = NODES_DATA.find(n => n.name === d.name);
+            return cityNode ? cityNode.x : networkWidth / 2;
+        })
+        .attr("y", d => {
+            const cityNode = NODES_DATA.find(n => n.name === d.name);
+            return cityNode ? cityNode.y + 20 : networkHeight / 2 + 20;
+        });
+
+            });
+        }
+
+        // ==================== TIMELINE INITIALIZATION ====================
+        
+        /**
+         * Initialize timeline
+         */
+        function initializeTimeline() {
+            updateTimelineDimensions();
+            
+            const { timelineNodes, timelineArcs } = createTimelineNodes(NODES_DATA);
+            const timelineSvg = d3.select("#timeline-svg");
+            const timelineGroup = timelineSvg.append("g").attr("class", "timeline-group");
+            
+            // Create timeline scale
+            const timelineScale = d3.scaleLinear()
+                .domain(CONFIG.timeline.yearRange)
+                .range([CONFIG.timeline.margin.left, timelineDimensions.width - CONFIG.timeline.margin.right]);
+
+            // Create timeline axis
+            timelineGroup.append("line")
+                .attr("class", "timeline-axis")
+                .attr("x1", CONFIG.timeline.margin.left)
+                .attr("y1", timelineDimensions.height / 2)
+                .attr("x2", timelineDimensions.width - CONFIG.timeline.margin.right)
+                .attr("y2", timelineDimensions.height / 2);
+
+            // Create timeline ticks
+            timelineGroup.selectAll(".timeline-tick")
+                .data(CONFIG.timeline.tickYears)
+                .join("line")
+                .attr("class", "timeline-tick")
+                .attr("x1", d => timelineScale(d))
+                .attr("y1", timelineDimensions.height / 2 - 10)
+                .attr("x2", d => timelineScale(d))
+                .attr("y2", timelineDimensions.height / 2 + 10);
+
+            // Create year labels
+            timelineGroup.selectAll(".timeline-year-label")
+                .data(CONFIG.timeline.tickYears)
+                .join("text")
+                .attr("class", "timeline-label")
+                .attr("x", d => timelineScale(d))
+                .attr("y", timelineDimensions.height / 2 + 25)
+                .text(d => d);
+
+            // Create timeline arcs
+            timelineGroup.selectAll(".timeline-arc")
+                .data(timelineArcs)
+                .join("path")
+                .attr("class", "timeline-arc")
+                .attr("d", d => {
+                    const x1 = timelineScale(d.startYear);
+                    const x2 = timelineScale(d.endYear);
+                    const y = timelineDimensions.height / 2 - CONFIG.timeline.arcOffset;
+                    const midX = (x1 + x2) / 2;
+                    const controlY = y - CONFIG.timeline.arcControlOffset;
+                    return `M ${x1} ${y} Q ${midX} ${controlY} ${x2} ${y}`;
+                });
+
+            // Create timeline nodes
+            timelineGroup.selectAll(".timeline-node")
+                .data(timelineNodes)
+                .join(enter => enter.append(d => {
+                    return d.nodeType === "birth" ? 
+                        document.createElementNS("http://www.w3.org/2000/svg", "circle") :
+                        document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                }))
+                .attr("class", "timeline-node")
+                .attr("fill", CONFIG.network.nodeColors.artist)
+                .each(function(d) {
+                    const element = d3.select(this);
+                    const x = timelineScale(d.year);
+                    const y = timelineDimensions.height / 2 - CONFIG.timeline.arcOffset;
+                    
+                    if (d.nodeType === "birth") {
+                        element
+                            .attr("cx", x)
+                            .attr("cy", y)
+                            .attr("r", CONFIG.timeline.nodeRadius);
+                    } else {
+                        element
+                            .attr("x", x - CONFIG.timeline.squareSize / 2)
+                            .attr("y", y - CONFIG.timeline.squareSize / 2)
+                            .attr("width", CONFIG.timeline.squareSize)
+                            .attr("height", CONFIG.timeline.squareSize);
+                    }
+                })
+                .on("click", (event, d) => {
+                    event.stopPropagation();
+                    selectNode(d.name, event, d);
+                })
+                .on("mouseover", showTooltip)
+                .on("mouseout", hideTooltip);
+
+            // Create timeline node labels
+            timelineGroup.selectAll(".timeline-node-label")
+                .data(timelineNodes)
+                .join("text")
+                .attr("class", "timeline-node-label")
+                .attr("x", d => timelineScale(d.year))
+                .attr("y", timelineDimensions.height / 2 - CONFIG.timeline.arcOffset - 15)
+                .text(d => `${d.name} ${d.nodeType === 'birth' ? 'b.' : 'd.'} ${d.year}`);
+
+            // Store timeline elements for resize
+            window.timelineScale = timelineScale;
+            window.timelineNodes = timelineNodes;
+            window.timelineArcs = timelineArcs;
+        }
+
+        // ==================== RESIZE HANDLING ====================
+        
+        /**
+         * Handle window resize
+         */
+        function handleResize() {
+            // Update network
+            updateNetworkDimensions();
+            simulation.force("center", d3.forceCenter(networkDimensions.width / 2, networkDimensions.height / 2));
+            simulation.alpha(1).restart();
+            
+            // Update timeline
+            updateTimelineDimensions();
+            const timelineScale = d3.scaleLinear()
+                .domain(CONFIG.timeline.yearRange)
+                .range([CONFIG.timeline.margin.left, timelineDimensions.width - CONFIG.timeline.margin.right]);
+            
+            // Update timeline elements
+            d3.select(".timeline-axis")
+                .attr("x2", timelineDimensions.width - CONFIG.timeline.margin.right);
+                
+            d3.selectAll(".timeline-tick")
+                .attr("x1", d => timelineScale(d))
+                .attr("x2", d => timelineScale(d));
+                
+            d3.selectAll(".timeline-label")
+                .attr("x", d => timelineScale(d));
+                
+            d3.selectAll(".timeline-arc")
+                .attr("d", d => {
+                    const x1 = timelineScale(d.startYear);
+                    const x2 = timelineScale(d.endYear);
+                    const y = timelineDimensions.height / 2 - CONFIG.timeline.arcOffset;
+                    const midX = (x1 + x2) / 2;
+                    const controlY = y - CONFIG.timeline.arcControlOffset;
+                    return `M ${x1} ${y} Q ${midX} ${controlY} ${x2} ${y}`;
+                });
+            
+            d3.selectAll(".timeline-node")
+                .each(function(d) {
+                    const element = d3.select(this);
+                    const x = timelineScale(d.year);
+                    const y = timelineDimensions.height / 2 - CONFIG.timeline.arcOffset;
+                    
+                    if (d.nodeType === "birth") {
+                        element.attr("cx", x).attr("cy", y);
+                    } else {
+                        element
+                            .attr("x", x - CONFIG.timeline.squareSize / 2)
+                            .attr("y", y - CONFIG.timeline.squareSize / 2);
+                    }
+                });
+            
+            d3.selectAll(".timeline-node-label")
+                .attr("x", d => timelineScale(d.year));
+        }
+
+        // ==================== INITIALIZATION ====================
+        
+        /**
+         * Initialize the entire dashboard
+         */
+        function initializeDashboard() {
+    initializeNetworkGraph();
+    initializeTimeline();
+    initializeSideMenu();
+    initializeSearch();
+
+    
+    // Add resize listener
+    window.addEventListener('resize', handleResize);
+    
+    // Add document click listener to close persistent tooltips
+    document.addEventListener('click', handleDocumentClick);
+    
+    // Add zoom button listeners
+    document.getElementById('zoom-in-btn').addEventListener('click', handleZoomIn);
+    document.getElementById('zoom-out-btn').addEventListener('click', handleZoomOut);
+    
+    // Add panning listeners
+    const svgWrapper = document.querySelector('.network-svg-wrapper');
+    svgWrapper.addEventListener('mousedown', handlePanStart);
+    document.addEventListener('mousemove', handlePanMove);
+    document.addEventListener('mouseup', handlePanEnd);
+    document.addEventListener('mouseleave', handlePanEnd);
+    
+    // Start simulation
+    simulation.alpha(1).restart();
+}
+
+// ==================== SEARCH MANAGEMENT ====================
+
+let searchActive = false;
+let timelineHidden = false;
+
+/**
+ * Perform search and highlight matching nodes
+ */
+function performSearch(searchTerm) {
+    const term = searchTerm.toLowerCase().trim();
+    
+    if (term === '') {
+        clearSearch();
+        return;
+    }
+    
+    // Find matching nodes
+    const matchingNodes = NODES_DATA.filter(node => 
+        node.name.toLowerCase().includes(term)
+    );
+    
+    // Update search results count
+    updateSearchResultsCount(matchingNodes.length, term);
+    
+    if (matchingNodes.length > 0) {
+        searchActive = true;
+        // Use the first matching node to select
+        selectNode(matchingNodes[0].name, null, matchingNodes[0]);
+    }
+}
+
+/**
+ * Clear search and reset highlighting
+ */
+function clearSearch() {
+    searchActive = false;
+    document.getElementById('search-box').value = '';
+    document.getElementById('search-clear-btn').classList.remove('show');
+    document.getElementById('search-results-count').textContent = '';
+    
+    // Reset all opacities
+    const { selectedOpacity } = CONFIG.effects;
+    
+    d3.selectAll(".network-node")
+        .style("opacity", selectedOpacity);
+    
+    d3.selectAll(".node-label")
+        .style("opacity", selectedOpacity);
+    
+    d3.selectAll(".network-link")
+        .style("opacity", selectedOpacity);
+    
+    d3.selectAll(".timeline-node")
+        .style("opacity", selectedOpacity);
+    
+    d3.selectAll(".timeline-node-label")
+        .style("opacity", selectedOpacity);
+    
+    d3.selectAll(".timeline-arc")
+        .style("opacity", 0);
+    
+    selectedNode = null;
+}
+
+/**
+ * Update search results count display
+ */
+function updateSearchResultsCount(count, term) {
+    const countEl = document.getElementById('search-results-count');
+    if (count === 0) {
+        countEl.textContent = 'No results';
+        countEl.style.color = 'rgba(255, 100, 100, 0.8)';
+    } else {
+        countEl.textContent = `Found: ${count}`;
+        countEl.style.color = 'rgba(102, 204, 255, 0.8)';
+    }
+}
+
+/**
+ * Toggle timeline visibility
+ */
+function toggleTimelineVisibility() {
+    timelineHidden = !timelineHidden;
+    const timelineContainer = document.querySelector('.timeline-container');
+    const toggleBtn = document.getElementById('timeline-toggle-btn');
+    const dashboard = document.querySelector('.dashboard');
+    
+    if (timelineHidden) {
+        timelineContainer.classList.add('hidden');
+        toggleBtn.classList.add('hidden');
+        toggleBtn.textContent = '📊 Show Timeline';
+        dashboard.style.gap = '0';
+    } else {
+        timelineContainer.classList.remove('hidden');
+        toggleBtn.classList.remove('hidden');
+        toggleBtn.textContent = '📊 Timeline';
+        dashboard.style.gap = '40px';
+    }
+}
+
+/**
+ * Initialize search functionality
+ */
+function initializeSearch() {
+    const searchBox = document.getElementById('search-box');
+    const searchClearBtn = document.getElementById('search-clear-btn');
+    
+    // Search input event
+    searchBox.addEventListener('input', function(event) {
+        const value = event.target.value.trim();
+        
+        // Show/hide clear button
+        if (value.length > 0) {
+            searchClearBtn.classList.add('show');
+        } else {
+            searchClearBtn.classList.remove('show');
+        }
+        
+        // Perform search
+        if (value.length >= 1) {
+            performSearch(value);
+        } else {
+            clearSearch();
+        }
+    });
+    
+    // Clear button click
+    searchClearBtn.addEventListener('click', clearSearch);
+    
+    // Enter key in search box
+    searchBox.addEventListener('keypress', function(event) {
+        if (event.key === 'Enter') {
+            const term = event.target.value.trim();
+            if (term.length > 0) {
+                performSearch(term);
+            }
+        }
+    });
+    
+    // Timeline toggle button
+    document.getElementById('timeline-toggle-btn').addEventListener('click', toggleTimelineVisibility);
+}
+
+
+	// ==================== SIDE MENU MANAGEMENT ====================
+
+let menuOpen = false;
+let articleViewerOpen = false;
+
+/**
+ * Toggle side menu
+ */
+function toggleSideMenu() {
+    menuOpen = !menuOpen;
+    const overlay = document.getElementById('overlay-backdrop');
+    const menu = document.getElementById('side-menu-overlay');
+    
+    if (menuOpen) {
+        overlay.classList.add('active');
+        menu.classList.add('active');
+    } else {
+        overlay.classList.remove('active');
+        menu.classList.remove('active');
+        closeArticleViewer();
+    }
+}
+
+/**
+ * Close menu
+ */
+function closeSideMenu() {
+    menuOpen = false;
+    document.getElementById('overlay-backdrop').classList.remove('active');
+    document.getElementById('side-menu-overlay').classList.remove('active');
+    closeArticleViewer();
+}
+
+/**
+ * Open article viewer
+ */
+function openArticleViewer(articleNumber) {
+    articleViewerOpen = true;
+    const selection = document.getElementById('articles-selection');
+    const viewer = document.getElementById('article-viewer');
+    const content = document.getElementById(`article-${articleNumber}-content`);
+    
+    // Hide all article contents
+    document.querySelectorAll('.article-content').forEach(el => {
+        el.style.display = 'none';
+    });
+    
+    // Show selected article
+    if (content) {
+        content.style.display = 'block';
+    }
+    
+    // Switch views
+    selection.style.display = 'none';
+    viewer.classList.add('active');
+}
+
+/**
+ * Close article viewer and return to selection
+ */
+function closeArticleViewer() {
+    articleViewerOpen = false;
+    const selection = document.getElementById('articles-selection');
+    const viewer = document.getElementById('article-viewer');
+    
+    selection.style.display = 'block';
+    viewer.classList.remove('active');
+}
+
+/**
+ * Initialize side menu event listeners
+ */
+function initializeSideMenu() {
+    // Menu toggle
+    document.getElementById('side-menu-toggle').addEventListener('click', toggleSideMenu);
+    
+    // Close button
+    document.getElementById('overlay-close').addEventListener('click', closeSideMenu);
+    
+    // Backdrop click
+    document.getElementById('overlay-backdrop').addEventListener('click', closeSideMenu);
+    
+    // Article cards
+    document.querySelectorAll('.article-card').forEach(card => {
+        card.addEventListener('click', function() {
+            const articleNum = this.getAttribute('data-article');
+            openArticleViewer(articleNum);
+        });
+    });
+    
+    // Article back button
+    document.getElementById('article-back-btn').addEventListener('click', closeArticleViewer);
+    
+    // Prevent overlay content clicks from closing menu
+    document.getElementById('side-menu-overlay').addEventListener('click', function(event) {
+        event.stopPropagation();
+    });
+}
+
+
+
+        // ==================== START APPLICATION ====================
+        
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', initializeDashboard);
+    </script>
+</body>
+</html>
