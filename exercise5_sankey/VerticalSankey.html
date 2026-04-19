@@ -7,9 +7,9 @@
     <style>
         body { margin: 0; padding: 0; overflow: hidden; font-family: Arial, sans-serif; }
         #tooltip { position: absolute; background: rgba(0,0,0,0.8); color: white; padding: 8px 12px; border-radius: 4px; pointer-events: none; font-size: 12px; z-index: 1000; display: none; }
-        .title { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.9); padding: 10px 20px; border-radius: 20px; font-size: 18px; z-index: 1000; }
-        .button-panel { position: absolute; top: 60px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 10px; border-radius: 4px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; }
-        .btn { padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .title { position: absolute; top: 10px; left: 10%; transform: translateX(-50%); background: rgba(255,255,255,0.9); padding: 10px 20px; border-radius: 20px; font-size: 18px; z-index: 1000; }
+        .button-panel { position: absolute;  border-radius: 6px; top: 60px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 10px; border-radius: 4px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; }
+        .btn { padding: 3px ;border-radius: 4px ; background: #747975; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 2em; }
         .btn:hover { background: #45a049; }
         .btn:active { transform: scale(0.98); }
     </style>
@@ -19,9 +19,9 @@
     <div id="p5-container"></div>
     <div id="tooltip"></div>
     <div class="button-panel">
-        <button class="btn" onclick="zoomInFunc()">Zoom In +</button>
-        <button class="btn" onclick="zoomOutFunc()">Zoom Out -</button>
-        <button class="btn" onclick="resetViewFunc()">Reset View</button>
+        <button class="btn" onclick="zoomInFunc()"> + </button>
+        <button class="btn" onclick="zoomOutFunc()"> - </button>
+       
     </div>
 
     <script>
@@ -81,7 +81,7 @@
                 AFC: [255, 107, 107], 
                 CAF: [69, 183, 209], 
                 CONCACAF: [150, 206, 180], 
-                CONMEBOL: [255, 234, 167],
+                CONMEBOL: [255, 134,  67],
                 UEFA: [221, 160, 221], 
                 OFC: [78, 205, 196]
             }
@@ -95,35 +95,35 @@
             virtualWidth: 1200,
             virtualHeight: 2000,
             margin: {top: 100, right: 100, bottom: -10, left: 100},
-            confederationBarWidth: 60,
-            nodeWidth: 25,
+            confederationBarWidth: 160,
+            nodeWidth: 45,
             nodePadding: 5,
-            yearSpacing: 200,
+            yearSpacing: 300,
             confederationToStageDistance: 350,
             strokeMin: 1,
             strokeMax: 50,
-            opacity: {normal: 150, selected: 255, dimmed: 25, linked: 225},
+            opacity: {normal:  60, selected: 255, dimmed: 25, linked: 225},
             initialZoom: 1.0,
             initialPanX: 0,
             initialPanY: 0,
             floatingAmplitude: 2,
             floatingSpeed: 0.03,
             yearOffsets: {
-                2022: 200,
-                2018: -200,
-                2014: 250,
-                2010: -250,
-                2006: 250
+                2022: 300,
+                2018: -300,
+                2014: 350,
+                2010: -350,
+                2006: 350
             },
             yearLabelOffsets: {
-                2022: { x: -120, y: -10 },      // ← Position label relative to year group (x = horizontal, y = vertical)
+                2022: { x: -120, y: -10 },      // Position label relative to year group (x = horizontal, y = vertical)
                 2018: { x: -120, y: -10 },
                 2014: { x: -120, y: -10 },
                 2010: { x: -120, y: -10 },
                 2006: { x: -120, y: -10 }
             },
-            yearLabelFontSize: 24,             // ← Font size for year labels
-            yearLabelColor: { r: 100, g: 100, b: 100 }  // ← Color for year labels
+            yearLabelFontSize: 24,             // Font size for year labels
+            yearLabelColor: { r: 100, g: 100, b: 100 }  // Color for year labels
         };
 
         // ==========================================
