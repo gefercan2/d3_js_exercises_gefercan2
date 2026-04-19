@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>FIFA Confederations Sankey - By Stage</title>
+    <title>FIFA Confederations Sankey - By Year</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
     <style>
         body { margin: 0; padding: 0; overflow: hidden; font-family: Arial, sans-serif; }
@@ -15,7 +15,7 @@
     </style>
 </head>
 <body>
-    <div class="title">FIFA Confederations by Tournament Stage (2010-2022)</div>
+    <div class="title">FIFA Confederations by Year (2010-2022)</div>
     <div id="p5-container"></div>
     <div id="tooltip"></div>
     <div class="button-panel">
@@ -35,41 +35,55 @@
             },
             stages: {
                 "Final": {
+                    2006: {AFC: 0, CAF: 0, CONCACAF: 0, CONMEBOL: 1, UEFA: 1, OFC: 0},
+                    2008: {AFC: 0, CAF: 0, CONCACAF: 0, CONMEBOL: 0, UEFA: 2, OFC: 0},
                     2010: {AFC: 0, CAF: 0, CONCACAF: 0, CONMEBOL: 0, UEFA: 2, OFC: 0},
                     2014: {AFC: 0, CAF: 0, CONCACAF: 0, CONMEBOL: 0, UEFA: 2, OFC: 0},
                     2018: {AFC: 0, CAF: 0, CONCACAF: 0, CONMEBOL: 0, UEFA: 2, OFC: 0},
                     2022: {AFC: 0, CAF: 0, CONCACAF: 0, CONMEBOL: 1, UEFA: 1, OFC: 0}
                 },
                 "Semifinal": {
+                    2006: {AFC: 2, CAF: 0, CONCACAF: 0, CONMEBOL: 1, UEFA: 1, OFC: 0},
+                    2008: {AFC: 0, CAF: 0, CONCACAF: 0, CONMEBOL: 0, UEFA: 4, OFC: 0},
                     2010: {AFC: 0, CAF: 0, CONCACAF: 0, CONMEBOL: 0, UEFA: 4, OFC: 0},
                     2014: {AFC: 0, CAF: 0, CONCACAF: 0, CONMEBOL: 0, UEFA: 4, OFC: 0},
                     2018: {AFC: 0, CAF: 0, CONCACAF: 0, CONMEBOL: 0, UEFA: 4, OFC: 0},
                     2022: {AFC: 0, CAF: 1, CONCACAF: 0, CONMEBOL: 1, UEFA: 2, OFC: 0}
                 },
                 "Cuartos de final": {
+                    2006: {AFC: 2, CAF: 1, CONCACAF: 1, CONMEBOL: 1, UEFA: 3, OFC: 0},
+                    2008: {AFC: 0, CAF: 0, CONCACAF: 0, CONMEBOL: 2, UEFA: 6, OFC: 0},
                     2010: {AFC: 0, CAF: 0, CONCACAF: 0, CONMEBOL: 2, UEFA: 6, OFC: 0},
                     2014: {AFC: 0, CAF: 0, CONCACAF: 0, CONMEBOL: 2, UEFA: 6, OFC: 0},
                     2018: {AFC: 0, CAF: 0, CONCACAF: 0, CONMEBOL: 2, UEFA: 6, OFC: 0},
                     2022: {AFC: 0, CAF: 1, CONCACAF: 0, CONMEBOL: 2, UEFA: 5, OFC: 0}
                 },
                 "Octavos de final": {
+                    2006: {AFC: 3, CAF: 1, CONCACAF: 2, CONMEBOL: 2, UEFA: 6, OFC: 0},
+                    2008: {AFC: 0, CAF: 1, CONCACAF: 1, CONMEBOL: 3, UEFA: 10, OFC: 1},
                     2010: {AFC: 1, CAF: 0, CONCACAF: 1, CONMEBOL: 4, UEFA: 10, OFC: 0},
                     2014: {AFC: 1, CAF: 0, CONCACAF: 1, CONMEBOL: 4, UEFA: 10, OFC: 0},
                     2018: {AFC: 1, CAF: 0, CONCACAF: 1, CONMEBOL: 4, UEFA: 10, OFC: 0},
                     2022: {AFC: 3, CAF: 2, CONCACAF: 1, CONMEBOL: 2, UEFA: 8, OFC: 0}
                 },
                 "Fase de Grupos": {
+                    2006: {AFC: 4, CAF: 5, CONCACAF: 3, CONMEBOL: 5, UEFA: 15, OFC: 0},
+                    2008: {AFC: 4, CAF: 5, CONCACAF: 4, CONMEBOL: 4, UEFA: 14, OFC: 1},
                     2010: {AFC: 6, CAF: 5, CONCACAF: 3, CONMEBOL: 5, UEFA: 14, OFC: 0},
                     2014: {AFC: 6, CAF: 5, CONCACAF: 3, CONMEBOL: 5, UEFA: 14, OFC: 0},
                     2018: {AFC: 6, CAF: 5, CONCACAF: 3, CONMEBOL: 5, UEFA: 14, OFC: 0},
                     2022: {AFC: 6, CAF: 5, CONCACAF: 4, CONMEBOL: 4, UEFA: 13, OFC: 0}
                 }
             },
-            years: [2010, 2014, 2018, 2022],
+            years: [2022, 2018, 2014, 2010, 2006 ],
+            stageOrder: ["Fase de Grupos", "Octavos de final", "Cuartos de final", "Semifinal", "Final"],
             colors: {
-                AFC: [255, 107, 107], CAF: [69, 183, 209], 
-                CONCACAF: [150, 206, 180], CONMEBOL: [255, 234, 167],
-                UEFA: [221, 160, 221], OFC: [78, 205, 196]
+                AFC: [255, 107, 107], 
+                CAF: [69, 183, 209], 
+                CONCACAF: [150, 206, 180], 
+                CONMEBOL: [255, 234, 167],
+                UEFA: [221, 160, 221], 
+                OFC: [78, 205, 196]
             }
         };
 
@@ -79,27 +93,37 @@
         
         const CONFIG = {
             virtualWidth: 1200,
-            virtualHeight: 2400,
-            margin: {top: 100, right: 100, bottom: 100, left: 100},
-            
-            // *** ADJUSTABLE VARIABLES FOR NODE SIZES ***
-            confederationBarWidth: 40,
-            confederationHeightScale: 0.7,
-            
-            nodeWidth: 20,
-            groupStageWidthScale: 0.6,
-            
-            nodePadding: 25,
-            stageSpacing: 100,
-            
-            // *** ADJUSTABLE VARIABLES FOR GRAPHIC POSITION AND ZOOM ***
-            initialZoom: 0.8,
-            initialPanX: 130,
-            initialPanY: -10,
-            
+            virtualHeight: 2000,
+            margin: {top: 100, right: 100, bottom: -10, left: 100},
+            confederationBarWidth: 60,
+            nodeWidth: 25,
+            nodePadding: 5,
+            yearSpacing: 200,
+            confederationToStageDistance: 350,
             strokeMin: 1,
             strokeMax: 50,
-            opacity: {normal: 150, selected: 255, dimmed: 75, linked: 225}
+            opacity: {normal: 150, selected: 255, dimmed: 25, linked: 225},
+            initialZoom: 1.0,
+            initialPanX: 0,
+            initialPanY: 0,
+            floatingAmplitude: 2,
+            floatingSpeed: 0.03,
+            yearOffsets: {
+                2022: 200,
+                2018: -200,
+                2014: 250,
+                2010: -250,
+                2006: 250
+            },
+            yearLabelOffsets: {
+                2022: { x: -120, y: -10 },      // ← Position label relative to year group (x = horizontal, y = vertical)
+                2018: { x: -120, y: -10 },
+                2014: { x: -120, y: -10 },
+                2010: { x: -120, y: -10 },
+                2006: { x: -120, y: -10 }
+            },
+            yearLabelFontSize: 24,             // ← Font size for year labels
+            yearLabelColor: { r: 100, g: 100, b: 100 }  // ← Color for year labels
         };
 
         // ==========================================
@@ -109,8 +133,10 @@
         const State = {
             view: { panX: CONFIG.initialPanX, panY: CONFIG.initialPanY, zoom: CONFIG.initialZoom, isPanning: false, lastX: 0, lastY: 0 },
             interaction: { selected: null, draggedNode: null, dragOffsetX: 0, dragOffsetY: 0, hoveredNode: null },
-            nodes: { confederations: [], stages: [], all: [] },
-            links: []
+            nodes: { confederations: [], years: [], all: [] },
+            links: [],
+            animation: { time: 0 },
+            yearGroups: []
         };
 
         // ==========================================
@@ -124,7 +150,32 @@
         };
 
         // ==========================================
-        // MODULE 5: NODE FACTORY
+        // MODULE 5: FLOATING ANIMATION
+        // ==========================================
+        
+        const FloatingAnimation = {
+            update() {
+                State.animation.time += CONFIG.floatingSpeed;
+            },
+            getOffset(nodeId) {
+                const hash = this.hashCode(nodeId.toString());
+                const xOffset = Math.sin(State.animation.time + hash * 0.1) * CONFIG.floatingAmplitude;
+                const yOffset = Math.cos(State.animation.time * 1.3 + hash * 0.2) * CONFIG.floatingAmplitude;
+                return { x: xOffset, y: yOffset };
+            },
+            hashCode(str) {
+                let hash = 0;
+                for (let i = 0; i < str.length; i++) {
+                    const char = str.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash;
+                }
+                return hash;
+            }
+        };
+
+        // ==========================================
+        // MODULE 6: NODE FACTORY
         // ==========================================
         
         const NodeFactory = {
@@ -141,53 +192,87 @@
                 return confederations.map(conf => {
                     const members = DATA.confederations[conf];
                     const width = members > 0 ? Math.max(30, (members / totalMembers) * availableWidth * 0.85) : 20;
-                    const node = { id: `conf_${conf}`, name: conf, displayName: `${conf} (${members})`, x: xPos, y: CONFIG.virtualHeight - CONFIG.margin.bottom - CONFIG.confederationBarWidth, width: width, height: CONFIG.confederationBarWidth * CONFIG.confederationHeightScale, value: members, type: 'confederation', draggable: true };
+                    const baseY = CONFIG.virtualHeight - CONFIG.margin.bottom - CONFIG.confederationBarWidth - CONFIG.confederationToStageDistance;
+                    const node = { id: `conf_${conf}`, name: conf, displayName: `${conf} (${members})`, x: xPos, y: baseY, baseY: baseY, width: width, height: CONFIG.confederationBarWidth, value: members, type: 'confederation', draggable: true };
                     xPos += width + 8;
                     return node;
                 });
             },
-            createStageNodes() {
-                const stageNames = Object.keys(DATA.stages);
+            createYearNodes() {
+                const years = DATA.years;
+                const stageOrder = DATA.stageOrder;
                 let yPos = CONFIG.margin.top;
                 const nodes = [];
-                stageNames.forEach((stageName, stageIndex) => {
-                    const yearNodesData = [];
-                    let totalStageWidth = 0;
-                    DATA.years.forEach(year => {
+                
+                years.forEach((year, yearIndex) => {
+                    let xPos = CONFIG.margin.left;
+                    const stageNodesData = [];
+                    let totalYearWidth = 0;
+                    
+                    stageOrder.forEach(stageName => {
                         const yearData = DATA.stages[stageName][year];
                         const totalTeams = Object.values(yearData).reduce((a, b) => a + b, 0);
                         if (totalTeams > 0) {
-                            const baseWidth = Math.max(30, totalTeams * 8);
-                            const width = stageName === "Fase de Grupos" ? baseWidth * CONFIG.groupStageWidthScale : baseWidth;
-                            yearNodesData.push({ width, totalTeams, yearData, year });
-                            totalStageWidth += width + CONFIG.nodePadding;
+                            const width = Math.max(30, totalTeams * 8);
+                            stageNodesData.push({ width, totalTeams, yearData, stageName });
+                            totalYearWidth += width + CONFIG.nodePadding;
                         }
                     });
-                    const startX = (CONFIG.virtualWidth - totalStageWidth) / 2;
-                    let xPos = startX;
-                    yearNodesData.forEach(data => {
-                        nodes.push({ id: `stage_${stageName}_${data.year}`, name: stageName, year: data.year, displayName: `${data.year}\n${stageName}`, x: xPos, y: yPos, width: data.width, height: CONFIG.nodeWidth, totalTeams: data.totalTeams, yearData: data.yearData, type: 'stage', draggable: true, segments: [] });
-                        xPos += data.width + CONFIG.nodePadding;
+                    
+                    const startX = (CONFIG.virtualWidth - totalYearWidth) / 2 + CONFIG.yearOffsets[year];
+                    let nodeXPos = startX;
+                    
+                    // Store year group info for label positioning
+                    const yearGroupInfo = {
+                        year: year,
+                        yPos: yPos,
+                        centerX: startX + totalYearWidth / 2,
+                        nodes: []
+                    };
+                    
+                    stageNodesData.forEach(data => {
+                        const nodeObj = { 
+                            id: `year_${year}_${data.stageName}`, 
+                            name: data.stageName, 
+                            year: year, 
+                            displayName: `${data.stageName}`, 
+                            x: nodeXPos, 
+                            y: yPos, 
+                            baseY: yPos, 
+                            width: data.width, 
+                            height: CONFIG.nodeWidth, 
+                            totalTeams: data.totalTeams, 
+                            yearData: data.yearData, 
+                            type: 'year', 
+                            draggable: true, 
+                            segments: [] 
+                        };
+                        nodes.push(nodeObj);
+                        yearGroupInfo.nodes.push(nodeObj);
+                        nodeXPos += data.width + CONFIG.nodePadding;
                     });
-                    yPos += CONFIG.stageSpacing;
+                    
+                    State.yearGroups.push(yearGroupInfo);
+                    yPos += CONFIG.yearSpacing;
                 });
+                
                 return nodes;
             }
         };
 
         // ==========================================
-        // MODULE 6: LINK FACTORY
+        // MODULE 7: LINK FACTORY
         // ==========================================
         
         const LinkFactory = { createLinks() {
             const links = [];
             const confederations = Object.keys(DATA.confederations);
-            State.nodes.stages.forEach(stageNode => {
+            State.nodes.years.forEach(yearNode => {
                 confederations.forEach(conf => {
-                    const teams = stageNode.yearData[conf] || 0;
+                    const teams = yearNode.yearData[conf] || 0;
                     if (teams > 0) {
                         const confNode = State.nodes.confederations.find(n => n.name === conf);
-                        links.push({ id: `link_${conf}_${stageNode.year}_${stageNode.name}`, source: confNode, target: stageNode, value: teams, confederation: conf, year: stageNode.year, stage: stageNode.name });
+                        links.push({ id: `link_${conf}_${yearNode.year}_${yearNode.name}`, source: confNode, target: yearNode, value: teams, confederation: conf, year: yearNode.year, stage: yearNode.name });
                     }
                 });
             });
@@ -195,7 +280,7 @@
         }};
 
         // ==========================================
-        // MODULE 7: GEOMETRY UTILITIES
+        // MODULE 8: GEOMETRY UTILITIES
         // ==========================================
         
         const Geometry = {
@@ -205,11 +290,11 @@
         };
 
         // ==========================================
-        // MODULE 8: SEGMENT CALCULATOR
+        // MODULE 9: SEGMENT CALCULATOR
         // ==========================================
         
         const SegmentCalculator = { updateSegments() {
-            State.nodes.stages.forEach(node => {
+            State.nodes.years.forEach(node => {
                 node.segments = [];
                 const confederations = Object.keys(DATA.confederations);
                 let currentX = node.x;
@@ -225,7 +310,7 @@
         }};
 
         // ==========================================
-        // MODULE 9: CONNECTION FINDER
+        // MODULE 10: CONNECTION FINDER
         // ==========================================
         
         const ConnectionFinder = {
@@ -235,7 +320,7 @@
                     State.links.filter(l => l.source === node).forEach(link => {
                         connected.add(link.target);
                     });
-                } else if (node.type === 'stage') {
+                } else if (node.type === 'year') {
                     State.links.filter(l => l.target === node).forEach(link => {
                         connected.add(link.source);
                     });
@@ -246,7 +331,7 @@
                 const connected = new Set();
                 if (node.type === 'confederation') {
                     State.links.filter(l => l.source === node).forEach(link => connected.add(link));
-                } else if (node.type === 'stage') {
+                } else if (node.type === 'year') {
                     State.links.filter(l => l.target === node).forEach(link => connected.add(link));
                 }
                 return connected;
@@ -254,7 +339,7 @@
         };
 
         // ==========================================
-        // MODULE 10: LINK RENDERER
+        // MODULE 11: LINK RENDERER
         // ==========================================
         
         const LinkRenderer = {
@@ -298,20 +383,13 @@
         };
 
         // ==========================================
-        // MODULE 11: NODE RENDERER
+        // MODULE 12: NODE RENDERER
         // ==========================================
         
         const NodeRenderer = {
-            draw() { State.nodes.confederations.forEach(node => this.drawConfederation(node)); State.nodes.stages.forEach(node => this.drawStage(node)); this.drawLabels(); },
-            drawConfederation(node) { const opacity = this.getNodeOpacity(node); const color = DATA.colors[node.name]; fill(color[0], color[1], color[2], opacity); stroke(255); strokeWeight(1); rect(node.x, node.y, node.width, node.height); },
-            drawStage(node) { node.segments.forEach(segment => { const opacity = this.getSegmentOpacity(node, segment); const color = DATA.colors[segment.confederation]; fill(color[0], color[1], color[2], opacity); stroke(255); strokeWeight(0.5); rect(segment.x, segment.y, segment.width, segment.height); }); },
-            getNodeOpacity(node) {
-                if (!State.interaction.selected) return CONFIG.opacity.normal;
-                if (State.interaction.selected === node) return CONFIG.opacity.selected;
-                const connectedNodes = ConnectionFinder.getConnectedNodes(State.interaction.selected);
-                if (connectedNodes.has(node)) return CONFIG.opacity.linked;
-                return CONFIG.opacity.dimmed;
-            },
+            draw() { State.nodes.confederations.forEach(node => this.drawConfederation(node)); State.nodes.years.forEach(node => this.drawYear(node)); this.drawLabels(); this.drawYearLabels(); },
+            drawConfederation(node) { const color = DATA.colors[node.name]; fill(color[0], color[1], color[2], 255); stroke(255); strokeWeight(1); rect(node.x, node.y, node.width, node.height); },
+            drawYear(node) { node.segments.forEach(segment => { const opacity = this.getSegmentOpacity(node, segment); const color = DATA.colors[segment.confederation]; fill(color[0], color[1], color[2], opacity); stroke(255); strokeWeight(0.5); rect(segment.x, segment.y, segment.width, segment.height); }); },
             getSegmentOpacity(node, segment) {
                 if (!State.interaction.selected) return CONFIG.opacity.normal;
                 if (State.interaction.selected === node) return CONFIG.opacity.selected;
@@ -324,18 +402,31 @@
                 fill(50); noStroke(); textAlign(CENTER, BOTTOM); textSize(11);
                 State.nodes.confederations.forEach(node => { text(node.displayName, node.x + node.width / 2, node.y - 5); });
                 textAlign(CENTER, TOP); textSize(10);
-                State.nodes.stages.forEach(node => { const lines = node.displayName.split('\n'); lines.forEach((line, i) => { text(line, node.x + node.width / 2, node.y + 8 + i * 12); }); });
+                State.nodes.years.forEach(node => { text(node.displayName, node.x + node.width / 2, node.y + 8); });
+            },
+            drawYearLabels() {
+                fill(CONFIG.yearLabelColor.r, CONFIG.yearLabelColor.g, CONFIG.yearLabelColor.b);
+                noStroke();
+                textAlign(CENTER, CENTER);
+                textSize(CONFIG.yearLabelFontSize);
+                textStyle(BOLD);
+                State.yearGroups.forEach(yearGroup => {
+                    const labelX = yearGroup.centerX + CONFIG.yearLabelOffsets[yearGroup.year].x;
+                    const labelY = yearGroup.yPos + CONFIG.yearLabelOffsets[yearGroup.year].y;
+                    text(yearGroup.year, labelX, labelY);
+                });
+                textStyle(NORMAL);
             }
         };
 
         // ==========================================
-        // MODULE 12: INTERACTION MANAGER
+        // MODULE 13: INTERACTION MANAGER
         // ==========================================
         
         const InteractionManager = {
             findElementAt(worldX, worldY) {
                 for (let node of State.nodes.confederations) { if (Geometry.pointInRect(worldX, worldY, node)) return node; }
-                for (let node of State.nodes.stages) { for (let segment of node.segments) { if (Geometry.pointInRect(worldX, worldY, segment)) { return {type: 'segment', node, segment}; } } }
+                for (let node of State.nodes.years) { for (let segment of node.segments) { if (Geometry.pointInRect(worldX, worldY, segment)) { return {type: 'segment', node, segment}; } } }
                 for (let link of State.links) { if (Geometry.pointNearBezier(worldX, worldY, link.curve, Math.max(10, link.curve?.width / 2 + 5))) { return link; } }
                 return null;
             },
@@ -343,7 +434,7 @@
         };
 
         // ==========================================
-        // MODULE 13: P5.JS MAIN FUNCTIONS
+        // MODULE 14: P5.JS MAIN FUNCTIONS
         // ==========================================
         
         let canvas, tooltip;
@@ -352,12 +443,32 @@
             canvas.parent('p5-container');
             tooltip = select('#tooltip');
             State.nodes.confederations = NodeFactory.createConfederationNodes();
-            State.nodes.stages = NodeFactory.createStageNodes();
-            State.nodes.all = [...State.nodes.confederations, ...State.nodes.stages];
+            State.nodes.years = NodeFactory.createYearNodes();
+            State.nodes.all = [...State.nodes.confederations, ...State.nodes.years];
             State.links = LinkFactory.createLinks();
+            
+            // Center the graphic on screen
+            const graphicsWidth = CONFIG.virtualWidth * CONFIG.initialZoom;
+            const graphicsHeight = CONFIG.virtualHeight * CONFIG.initialZoom;
+            State.view.panX = (windowWidth - graphicsWidth) / 2;
+            State.view.panY = (windowHeight - graphicsHeight) / 2;
         }
         function draw() {
             background(245);
+            
+            // Update floating animation
+            FloatingAnimation.update();
+            
+            // Apply floating effect to nodes
+            State.nodes.confederations.forEach(node => {
+                const float = FloatingAnimation.getOffset(node.id);
+                node.y = node.baseY + float.y;
+            });
+            State.nodes.years.forEach(node => {
+                const float = FloatingAnimation.getOffset(node.id);
+                node.y = node.baseY + float.y;
+            });
+            
             push();
             Transform.apply();
             SegmentCalculator.updateSegments();
@@ -365,10 +476,17 @@
             NodeRenderer.draw();
             pop();
         }
-        function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+        function windowResized() { 
+            resizeCanvas(windowWidth, windowHeight);
+            // Recenter on resize
+            const graphicsWidth = CONFIG.virtualWidth * State.view.zoom;
+            const graphicsHeight = CONFIG.virtualHeight * State.view.zoom;
+            State.view.panX = (windowWidth - graphicsWidth) / 2;
+            State.view.panY = (windowHeight - graphicsHeight) / 2;
+        }
 
         // ==========================================
-        // MODULE 14: EVENT HANDLERS
+        // MODULE 15: EVENT HANDLERS
         // ==========================================
         
         function mouseMoved() {
@@ -415,8 +533,8 @@
             if (State.interaction.draggedNode) { 
                 const world = Transform.toWorld(mouseX, mouseY); 
                 const node = State.interaction.draggedNode; 
+                node.baseY = world.y - State.interaction.dragOffsetY;
                 node.x = constrain(world.x - State.interaction.dragOffsetX, 0, CONFIG.virtualWidth - node.width); 
-                node.y = constrain(world.y - State.interaction.dragOffsetY, 0, CONFIG.virtualHeight - node.height); 
                 hideTooltip(); 
             }
         }
@@ -426,14 +544,14 @@
         }
 
         // ==========================================
-        // MODULE 15: TOOLTIP HELPERS
+        // MODULE 16: TOOLTIP HELPERS
         // ==========================================
         
         function showTooltip(element, x, y) {
             let text = '';
             if (element.type === 'confederation') { text = `${element.name}<br/>Members: ${element.value}`; }
             else if (element.type === 'segment') { text = `${element.segment.confederation} - ${element.node.year}<br/>${element.node.name}<br/>Teams: ${element.segment.teams}`; }
-            else if (element.type === 'stage') { text = `${element.year} ${element.name}<br/>Total: ${element.totalTeams}`; }
+            else if (element.type === 'year') { text = `${element.year} ${element.name}<br/>Total: ${element.totalTeams}`; }
             else if (element.confederation) { text = `${element.confederation} → ${element.year}<br/>${element.stage} (${element.value} teams)`; }
             tooltip.html(text);
             tooltip.style('display', 'block');
@@ -443,7 +561,7 @@
         function hideTooltip() { tooltip.style('display', 'none'); }
 
         // ==========================================
-        // MODULE 16: BUTTON CONTROLS
+        // MODULE 17: BUTTON CONTROLS
         // ==========================================
         
         function zoomInFunc() {
@@ -456,6 +574,10 @@
             State.view.panX = CONFIG.initialPanX;
             State.view.panY = CONFIG.initialPanY;
             State.view.zoom = CONFIG.initialZoom;
+            const graphicsWidth = CONFIG.virtualWidth * State.view.zoom;
+            const graphicsHeight = CONFIG.virtualHeight * State.view.zoom;
+            State.view.panX = (windowWidth - graphicsWidth) / 2;
+            State.view.panY = (windowHeight - graphicsHeight) / 2;
         }
     </script>
 </body>
