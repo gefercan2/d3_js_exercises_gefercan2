@@ -16,6 +16,10 @@
     display: block;
     margin: auto;
     background: #0b3d91;
+    cursor: grab;
+  }
+  svg:active {
+    cursor: grabbing;
   }
   .land {
     stroke: #333;
@@ -85,6 +89,29 @@
 
   let land;
   let rotation = 0;
+  let isDragging = false;
+  let dragStartX = 0;
+  let autoRotate = true;
+
+  // Mouse drag controls
+  svg.on("mousedown", function(event) {
+    isDragging = true;
+    dragStartX = event.clientX;
+    autoRotate = false;
+  });
+
+  document.addEventListener("mousemove", function(event) {
+    if (isDragging) {
+      const dragDelta = event.clientX - dragStartX;
+      rotation += dragDelta * 0.5;
+      dragStartX = event.clientX;
+    }
+  });
+
+  document.addEventListener("mouseup", function() {
+    isDragging = false;
+    autoRotate = true;
+  });
 
   d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json").then(countriesTopo => {
     const countries = topojson.feature(countriesTopo, countriesTopo.objects.countries).features;
@@ -143,7 +170,9 @@
 
     // Start rotation animation
     d3.timer(() => {
-      rotation = (rotation + 0.3) % 360;
+      if (autoRotate) {
+        rotation = (rotation + 0.3) % 360;
+      }
       projection.rotate([rotation, -20]);
       
       // Update land paths
