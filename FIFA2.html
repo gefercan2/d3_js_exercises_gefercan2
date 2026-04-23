@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>World Cup Best Results Scatter Plot</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  <style>
+    :root {
+      --color-uefa: #378ADD;
+      --color-conmebol: #D85A30;
+      --color-afc: #639922;
+      --color-caf: #BA7517;
+      --color-concacaf: #7F77DD;
+      --color-base-dot: #999999;
+      --color-stage-line: #b0b0b0;
+      --color-grid-line: #e0e0e0;
+      --color-concentric: #000000;
+      --color-text: #2c2c2a;
+      --color-text-muted: #888780;
+      --color-bg-primary: #ffffff;
+      --color-bg-secondary: #f8f8f8;
+      --color-border: #ddd;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 2rem;
+      background: var(--color-bg-primary);
+      color: var(--color-text);
+    }
+
+    .menu-button {
+      position: fixed;
+      top: 2rem;
+      right: 2rem;
+      width: 50px;
+      height: 50px;
+      background: var(--color-bg-secondary);
+      border: 0.5px solid var(--color-border);
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 4px;
+      z-index: 100;
+      transition: background-color 0.2s;
+    }
+
+    .menu-button:hover {
+      background: var(--color-border);
+    }
+
+    .menu-button span {
+      width: 24px;
+      height: 2px;
+      background: var(--color-text);
+      display: block;
+    }
+
+    .side-menu {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 50%;
+      height: 100vh;
+      background: var(--color-bg-primary);
+      border-left: 0.5px solid var(--color-border);
+      box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      z-index: 99;
+      overflow-y: auto;
+    }
+
+    .side-menu.active {
+      transform: translateX(0);
+    }
+
+    .menu-close {
+      position: absolute;
+      top: 1.5rem;
+      right: 1.5rem;
+      width: 30px;
+      height: 30px;
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: var(--color-text);
+    }
+
+    .menu-content {
+      padding: 4rem 2rem 2rem;
+    }
+
+    .menu-title {
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: 2rem;
+      color: var(--color-text);
+    }
+
+    .article-option {
+      padding: 1.5rem;
+      border: 0.5px solid var(--color-border);
+      border-radius: 4px;
+      margin-bottom: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .article-option:hover {
+      background: var(--color-bg-secondary);
+      border-color: var(--color-text-muted);
+    }
+
+    .article-option h3 {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+      color: var(--color-text);
+    }
+
+    .article-option p {
+      font-size: 12px;
+      color: var(--color-text-muted);
+      line-height: 1.5;
+    }
+
+    .menu-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.3);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      z-index: 98;
+    }
+
+    .menu-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .controls {
+      max-width: 1400px;
+      margin: 0 auto 1.5rem;
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+      align-items: center;
+      padding: 1rem;
+      background: var(--color-bg-secondary);
+      border-radius: 4px;
+      border: 0.5px solid var(--color-border);
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .control-group label {
+      font-size: 12px;
+      font-weight: 500;
+      color: #666;
+    }
+
+    .control-group select {
+      padding: 6px 8px;
+      border: 0.5px solid var(--color-border);
+      border-radius: 4px;
+      font-size: 13px;
+      background: var(--color-bg-primary);
+      color: var(--color-text);
+    }
+
+    #chart {
+      width: 100%;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .axis {
+      font-size: 12px;
+      color: var(--color-text-muted);
+    }
+
+    .axis-label {
+      font-size: 13px;
+      color: var(--color-text-muted);
+      font-weight: 500;
+    }
+
+    .axis path,
+    .axis line {
+      stroke: none;
+    }
+
+    .grid-line {
+      stroke: var(--color-grid-line);
+      stroke-width: 0.5;
+      stroke-dasharray: 2;
+    }
+
+    .stage-line {
+      stroke: var(--color-stage-line);
+      stroke-width: 2;
+      opacity: 0.6;
+    }
+
+    .base-dot {
+      fill: var(--color-base-dot);
+      opacity: 1;
+    }
+
+    .participation-circle {
+      fill-opacity: 0.5;
+      stroke-width: 1.5;
+    }
+
+    .concentric-circle {
+      fill: none;
+      stroke: var(--color-concentric);
+      stroke-width: 1;
+      opacity: 0.6;
+    }
+
+    .title {
+      font-size: 18px;
+      font-weight: 500;
+      fill: var(--color-text);
+    }
+
+    .tooltip {
+      position: absolute;
+      background: var(--color-bg-secondary);
+      border: 0.5px solid var(--color-border);
+      border-radius: 4px;
+      padding: 8px 12px;
+      font-size: 12px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 10;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .tooltip.active {
+      opacity: 1;
+    }
+
+    .legend {
+      max-width: 1400px;
+      margin: 2rem auto 0;
+      padding: 1rem;
+      background: var(--color-bg-secondary);
+      border-radius: 4px;
+      border: 0.5px solid var(--color-border);
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: inline-block;
+      margin-right: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .legend-color {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --color-base-dot: #666666;
+        --color-stage-line: #666666;
+        --color-grid-line: #404040;
+        --color-concentric: #ffffff;
+        --color-text: #f0f0f0;
+        --color-text-muted: #a0a0a0;
+        --color-bg-primary: #1a1a1a;
+        --color-bg-secondary: #2a2a2a;
+        --color-border: #444;
+      }
+
+      body {
+        background: var(--color-bg-primary);
+      }
+
+      .menu-button:hover {
+        background: #333;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<button class="menu-button" id="menuButton">
+  <span></span>
+  <span></span>
+  <span></span>
+</button>
+
+<div class="menu-overlay" id="menuOverlay"></div>
+
+<div class="side-menu" id="sideMenu">
+  <button class="menu-close" id="menuClose">&times;</button>
+  <div class="menu-content">
+    <div class="menu-title">Articles</div>
+    
+    <div class="article-option" onclick="window.open('#article1')">
+      <h3>Understanding D3 Violin Plots</h3>
+      <p>A comprehensive guide to the code structure and logic behind interactive data visualizations using D3.js. Explore how hierarchical data is transformed and rendered into meaningful visual patterns.</p>
+    </div>
+
+    <div class="article-option" onclick="window.open('#article2')">
+      <h3>World Cup Performance Analysis</h3>
+      <p>Deep dive into the statistical patterns of World Cup tournament results. Learn how confederation performance, historical trends, and country rankings reveal insights about international football competition.</p>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="control-group">
+    <label for="yAxisSelect">Y-Axis Display:</label>
+    <select id="yAxisSelect">
+      <option value="best">Best Result Year</option>
+      <option value="debut">Debut Year</option>
+    </select>
+  </div>
+</div>
+
+<div id="chart"></div>
+<div class="tooltip" id="tooltip"></div>
+
+<div class="legend" id="legend"></div>
+
+<script>
+// Menu functionality
+const menuButton = document.getElementById("menuButton");
+const sideMenu = document.getElementById("sideMenu");
+const menuOverlay = document.getElementById("menuOverlay");
+const menuClose = document.getElementById("menuClose");
+
+menuButton.addEventListener("click", () => {
+  sideMenu.classList.add("active");
+  menuOverlay.classList.add("active");
+});
+
+menuClose.addEventListener("click", () => {
+  sideMenu.classList.remove("active");
+  menuOverlay.classList.remove("active");
+});
+
+menuOverlay.addEventListener("click", () => {
+  sideMenu.classList.remove("active");
+  menuOverlay.classList.remove("active");
+});
+
+// Actual color values for use in JavaScript
+const confColorsActual = {
+  "UEFA": "#378ADD",
+  "CONMEBOL": "#D85A30",
+  "AFC": "#639922",
+  "CAF": "#BA7517",
+  "CONCACAF": "#7F77DD"
+};
+
+// Map stage names to numeric values for x-axis
+const stageMap = {
+  "Champions": 5,
+  "Runners-up": 4.5,
+  "Third place": 4.2,
+  "Fourth place": 4,
+  "Semi-finals": 3.8,
+  "Quarter-finals": 3,
+  "Round of 16": 2,
+  "Group stage": 1
+};
+
+// Stage labels for x-axis
+const stageLabels = {
+  1: "Group",
+  2: "R16",
+  3: "QF",
+  3.8: "SF",
+  4: "4th",
+  4.2: "3rd",
+  4.5: "Final",
+  5: "Winner"
+};
+
+// Function to transform CSV data to JSON structure
+function transformCSVToJSON(csvData) {
+  return csvData.map(row => {
+    // Extract best result year from "Best result year" column
+    const bestResultYearStr = row["Best result year"] ? row["Best result year"].trim() : "";
+    const bestYear = bestResultYearStr ? parseInt(bestResultYearStr.replace(/[^\d]/g, "")) : new Date().getFullYear();
+    
+    // Extract best result from "Best result" column
+    const bestResult = row["Best result"] ? row["Best result"].trim() : "Group stage";
+    
+    // Parse debut year
+    const debutYear = row["Debut"] ? parseInt(row["Debut"]) : new Date().getFullYear();
+    
+    // Parse appearances
+    const appearances = row["Appearances"] ? parseInt(row["Appearances"]) : 1;
+    
+    // Parse confederation
+    const confederation = row["Confederation"] ? row["Confederation"].trim() : "Other";
+    
+    // Parse team name
+    const team = row["Team"] ? row["Team"].trim() : "";
+    
+    // Count times achieved - parse from "Record streak" and "Active streak"
+    const recordStreak = row["Record streak"] ? parseInt(row["Record streak"]) : 0;
+    const activeStreak = row["Active streak"] ? parseInt(row["Active streak"]) : 0;
+    const timesAchieved = Math.max(recordStreak, activeStreak, 1);
+    
+    return {
+      team: team,
+      appearances: appearances,
+      bestResult: bestResult,
+      bestYear: bestYear,
+      debutYear: debutYear,
+      timesAchieved: timesAchieved,
+      confederation: confederation,
+      stageValue: stageMap[bestResult] || 1,
+      x: stageMap[bestResult] || 1,
+      y_best: bestYear,
+      y_debut: debutYear,
+      radius: Math.sqrt(appearances) * 3
+    };
+  }).filter(d => d.team && d.team.length > 0);
+}
+
+// Load CSV file and initialize visualization
+function loadAndVisualize(csvFilePath) {
+  d3.csv(csvFilePath).then(csvData => {
+    const transformedData = transformCSVToJSON(csvData);
+    initializeVisualization(transformedData);
+  }).catch(error => {
+    console.error("Error loading CSV file:", error);
+    alert("Error loading CSV file. Please check the file path and format.");
+  });
+}
+
+// Global variables
+let transformedData = [];
+let currentYAxis = "best";
+
+// Overlap avoidance function
+function resolveOverlaps(data, xScale, yScale, minDistance = 40) {
+  const padding = 15;
+  const maxIterations = 100;
+  let iterations = 0;
+  let overlaps = true;
+
+  while (overlaps && iterations < maxIterations) {
+    overlaps = false;
+    iterations++;
+
+    for (let i = 0; i < data.length; i++) {
+      for (let j = i + 1; j < data.length; j++) {
+        const d1 = data[i];
+        const d2 = data[j];
+
+        if (d1.x === d2.x && d1.currentY === d2.currentY) {
+          const x1 = xScale(d1.x);
+          const y1 = yScale(d1.currentY);
+          const x2 = xScale(d2.x);
+          const y2 = yScale(d2.currentY);
+
+          const dx = x2 - x1;
+          const dy = y2 - y1;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          const minDist = d1.radius + d2.radius + padding;
+
+          if (distance < minDist) {
+            overlaps = true;
+            const angle = Math.atan2(dy, dx);
+            const moveDistance = (minDist - distance) / 2;
+            
+            d1.offsetX = (d1.offsetX || 0) - Math.cos(angle) * moveDistance;
+            d1.offsetY = (d1.offsetY || 0) - Math.sin(angle) * moveDistance;
+            d2.offsetX = (d2.offsetX || 0) + Math.cos(angle) * moveDistance;
+            d2.offsetY = (d2.offsetY || 0) + Math.sin(angle) * moveDistance;
+          }
+        }
+      }
+    }
+  }
+
+  return data;
+}
+
+// Dimensions
+const margin = { top: 40, right: 60, bottom: 80, left: 80 };
+const width = Math.min(1400, window.innerWidth - 40) - margin.left - margin.right;
+const height = 600 - margin.top - margin.bottom;
+
+// Initialize visualization
+function initializeVisualization(data) {
+  transformedData = data;
+  
+  // Remove existing chart
+  d3.select("#chart").selectAll("*").remove();
+  d3.select("#legend").selectAll("*").remove();
+
+  // Create SVG
+  const svg = d3.select("#chart")
+    .append("svg")
+    .attr("viewBox", [0, 0, width + margin.left + margin.right, height + margin.top + margin.bottom])
+    .attr("preserveAspectRatio", "xMinYMin meet")
+    .style("background-color", "var(--color-bg-primary)");
+
+  const g = svg.append("g")
+    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+  // Scales
+  const xScale = d3.scaleLinear()
+    .domain([0.5, 5.5])
+    .range([0, width]);
+
+  const yScale = d3.scaleLinear()
+    .domain([1930, 2030])
+    .range([height, 0]);
+
+  const radiusScale = d3.scaleSqrt()
+    .domain([1, d3.max(transformedData, d => d.appearances)])
+    .range([4, 20]);
+
+  // Group containers
+  const gridGroup = g.append("g").attr("class", "grid-group");
+  const stageLineGroup = g.append("g").attr("class", "stage-line-group");
+  const dotsGroup = g.append("g").attr("class", "dots-group");
+
+  // Update grid lines
+  gridGroup.selectAll(".grid-line-x")
+    .data(xScale.ticks(8))
+    .enter()
+    .append("line")
+    .attr("class", "grid-line")
+    .attr("x1", d => xScale(d))
+    .attr("x2", d => xScale(d))
+    .attr("y1", 0)
+    .attr("y2", height);
+
+  gridGroup.selectAll(".grid-line-y")
+    .data(yScale.ticks(10))
+    .enter()
+    .append("line")
+    .attr("class", "grid-line")
+    .attr("x1", 0)
+    .attr("x2", width)
+    .attr("y1", d => yScale(d))
+    .attr("y2", d => yScale(d));
+
+  // Update stage lines
+  const stagePositions = [1, 2, 3, 3.8, 4, 4.2, 4.5, 5];
+  stageLineGroup.selectAll(".stage-line")
+    .data(stagePositions)
+    .enter()
+    .append("line")
+    .attr("class", "stage-line")
+    .attr("x1", d => xScale(d) + 80)
+    .attr("x2", d => xScale(d) + 80)
+    .attr("y1", 110)
+    .attr("y2", height)
+    .attr("stroke-width", 2);
+
+  // Function to update visualization
+  function updateVisualization() {
+    const yValue = currentYAxis === "best" ? "y_best" : "y_debut";
+
+    const dataWithY = transformedData.map(d => ({
+      ...d,
+      currentY: d[yValue],
+      offsetX: 0,
+      offsetY: 0
+    }));
+
+    resolveOverlaps(dataWithY, xScale, yScale);
+
+    dotsGroup.selectAll("*").remove();
+
+    const tooltip = d3.select("#tooltip");
+
+    const nodeGroups = dotsGroup.selectAll(".node-group")
+      .data(dataWithY)
+      .enter()
+      .append("g")
+      .attr("class", "node-group")
+      .attr("transform", d => `translate(${xScale(d.x) + d.offsetX},${yScale(d.currentY) + d.offsetY})`);
+
+    nodeGroups.append("circle")
+      .attr("class", "base-dot")
+      .attr("r", 2);
+
+    nodeGroups.append("circle")
+      .attr("class", "participation-circle")
+      .attr("r", d => radiusScale(d.appearances))
+      .attr("fill", d => confColorsActual[d.confederation] || "#999999")
+      .attr("stroke", d => confColorsActual[d.confederation] || "#999999");
+
+    nodeGroups.each(function(d) {
+      if (d.timesAchieved > 1) {
+        for (let i = 1; i < d.timesAchieved; i++) {
+          d3.select(this).append("circle")
+            .attr("class", "concentric-circle")
+            .attr("r", radiusScale(d.appearances) + (i * 5));
+        }
+      }
+    });
+
+    nodeGroups.on("mouseover", function(event, d) {
+      const yearLabel = currentYAxis === "best" ? `Best Year: ${d.bestYear}` : `Debut Year: ${d.debutYear}`;
+      tooltip.classed("active", true)
+        .html(`<strong>${d.team}</strong><br/>
+               Stage: ${d.bestResult}<br/>
+               ${yearLabel}<br/>
+               Appearances: ${d.appearances}<br/>
+               Times Achieved: ${d.timesAchieved}<br/>
+               Confederation: ${d.confederation}`)
+        .style("left", (event.pageX + 10) + "px")
+        .style("top", (event.pageY - 10) + "px");
+    })
+    .on("mousemove", function(event) {
+      tooltip.style("left", (event.pageX + 10) + "px")
+        .style("top", (event.pageY - 10) + "px");
+    })
+    .on("mouseout", function() {
+      tooltip.classed("active", false);
+    });
+  }
+
+  // X-axis
+  const xAxis = d3.axisBottom(xScale)
+    .tickValues([1, 2, 3, 3.8, 4, 4.2, 4.5, 5])
+    .tickFormat(d => stageLabels[d] || "");
+
+  g.append("g")
+    .attr("transform", `translate(0,${height})`)
+    .call(xAxis)
+    .attr("class", "axis");
+
+  g.append("text")
+    .attr("x", width / 2)
+    .attr("y", height + 65)
+    .attr("class", "axis-label")
+    .style("text-anchor", "middle")
+    .text("Best World Cup Stage Reached");
+
+  // Y-axis
+  const yAxis = d3.axisLeft(yScale)
+    .tickFormat(d3.format("d"));
+
+  g.append("g")
+    .attr("class", "axis axis-y")
+    .call(yAxis);
+
+  g.append("text")
+    .attr("transform", "rotate(-90)")
+    .attr("y", -65)
+    .attr("x", -height / 2)
+    .attr("class", "axis-label")
+    .style("text-anchor", "middle")
+    .text("Year of Best Result");
+
+  // Title
+  svg.append("text")
+    .attr("x", (width + margin.left + margin.right) / 2)
+    .attr("y", 25)
+    .attr("text-anchor", "middle")
+    .attr("class", "title")
+    .text("World Cup Performance: Best Results by Stage and Year");
+
+  // Event listener for y-axis toggle
+  document.getElementById("yAxisSelect").addEventListener("change", function(e) {
+    currentYAxis = e.target.value;
+    updateVisualization();
+  });
+
+  // Create legend
+  const legendContainer = d3.select("#legend");
+  const confArray = Object.keys(confColorsActual);
+
+  legendContainer.append("div")
+    .style("font-weight", "500")
+    .style("margin-bottom", "0.5rem")
+    .text("Visual Structure:");
+
+  const legendItems = [
+    "Gray dot = country coordinate point",
+    "Colored circle = participation count (size proportional to appearances)",
+    "Concentric rings = multiple achievements at same best stage"
+  ];
+
+  legendItems.forEach(item => {
+    legendContainer.append("div")
+      .attr("class", "legend-item")
+      .style("display", "block")
+      .style("margin-bottom", "0.3rem")
+      .text(item);
+  });
+
+  legendContainer.append("div")
+    .style("margin-top", "1rem")
+    .style("font-weight", "500")
+    .style("margin-bottom", "0.5rem")
+    .text("Confederations:");
+
+  confArray.forEach(conf => {
+    const item = legendContainer.append("div")
+      .attr("class", "legend-item");
+    
+    item.append("span")
+      .attr("class", "legend-color")
+      .style("background", confColorsActual[conf]);
+    
+    item.append("span")
+      .text(conf);
+  });
+
+  // Initial visualization
+  updateVisualization();
+}
+
+// Load CSV file - specify your CSV file path here
+loadAndVisualize("FIFA_Countries.csv");
+
+</script>
+
+</body>
+</html>
