@@ -7,7 +7,7 @@ https://d3js.org/<br>
 There is a portal for d3 exercises, Observable, where you can do graphics in d3, browser-based:
 https://observablehq.com/
 <br>
-Usualy each graphic has already its own template, like shown in this page, although in previous versions of the library
+Usualy each graphic has already its own template, like shown in this page, although in previous versions of the library  <br>
 https://d3-graph-gallery.com/<br>
 here an overview of customisation: <br>
 https://d3-graph-gallery.com/graph/shape.html <br>
