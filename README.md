@@ -11,6 +11,7 @@ Usualy each graphic has already its own template, like shown in this page, altho
 https://d3-graph-gallery.com/<br>
 here an overview of customisation: <br>
 https://d3-graph-gallery.com/graph/shape.html <br>
+https://d3-graph-gallery.com/interactivity.html  <br>
 
 Among the places rthat work with d3 are Flourish and RawGraph:
 https://flourish.studio/, https://www.rawgraphs.io/<br>
