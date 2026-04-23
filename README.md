@@ -1,6 +1,6 @@
 # D3.js exercises
 
-D3 (from d.d.d. : data driven document) is a Java Script library focused in data visualziation, created and developed by Mike Bostock and others.
+D3 (from d.d.d. : data driven document) is a Java Script library focused in data visualziation, created and developed by Mike Bostock and others. "D3 (or D3.js) is a free, open-source JavaScript library for visualizing data. Its low-level approach built on web standards offers unparalleled flexibility in authoring dynamic, data-driven graphics. For more than a decade D3 has powered groundbreaking and award-winning visualizations, become a foundational building block of higher-level chart libraries, and fostered a vibrant community of data practitioners around the world."
 https://en.wikipedia.org/wiki/D3.js <br>
 This is the d3 homepage:
 https://d3js.org/<br>
