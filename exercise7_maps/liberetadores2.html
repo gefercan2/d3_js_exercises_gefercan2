@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Copa Libertadores Winners Map</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/topojson@3"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+        }
+        
+        #map-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-top: 0;
+        }
+        
+        .country {
+            stroke: #fff;
+            stroke-width: 1.5px;
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+        
+        .country:hover {
+            opacity: 0.7;
+        }
+        
+        .city-circle {
+            fill: #c62828;
+            stroke: #fff;
+            stroke-width: 1.5px;
+            cursor: pointer;
+            opacity: 0.8;
+        }
+        
+        .city-circle:hover {
+            opacity: 1;
+            stroke-width: 2.5px;
+        }
+        
+        .tooltip {
+            position: absolute;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            border-radius: 6px;
+            pointer-events: none;
+            font-size: 13px;
+            line-height: 1.5;
+            max-width: 300px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+        
+        .tooltip-title {
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.3);
+            padding-bottom: 4px;
+        }
+        
+        .tooltip-content {
+            font-size: 12px;
+        }
+        
+        .legend {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 6px;
+        }
+        
+        .legend-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .legend-item {
+            display: inline-block;
+            margin-right: 20px;
+            margin-bottom: 8px;
+        }
+        
+        .legend-color {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+            vertical-align: middle;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div id="map-container">
+        <h1>Copa Libertadores Winners (1960-2025)</h1>
+        <svg id="map"></svg>
+        <div class="legend">
+            <div class="legend-title">Countries by Number of Titles</div>
+            <div id="legend-items"></div>
+        </div>
+    </div>
+
+    <script>
+        // Data
+        const data = `Year,Country,Winner Club,city,coordinates longitude,coordinate latitude,foundation year
+1960,Uruguay,Peñarol,Montevideo,34.9011,56.1645,1891
+1961,Uruguay,Peñarol,Montevideo,34.9011,56.1645,1891
+1962,Brazil,Santos,Sao Paulo,23.5505,46.6333,1912
+1963,Brazil,Santos,Sao Paulo,23.5505,46.6333,1912
+1964,Argentina,Independiente,Avellaneda,34.6611,58.3669,1905
+1965,Argentina,Independiente,Avellaneda,34.6611,58.3669,1905
+1966,Uruguay,Peñarol,Montevideo,34.9011,56.1645,1891
+1967,Argentina,Racing Club,Avellaneda,34.6611,58.3669,1903
+1968,Argentina,Estudiantes,La Plata,34.9215,57.9545,1905
+1969,Argentina,Estudiantes,La Plata,34.9215,57.9545,1905
+1970,Argentina,Estudiantes,La Plata,34.9215,57.9545,1905
+1971,Uruguay,Nacional,Montevideo,34.9011,56.1645,1899
+1972,Argentina,Independiente,Avellaneda,34.6611,58.3669,1905
+1973,Argentina,Independiente,Avellaneda,34.6611,58.3669,1905
+1974,Argentina,Independiente,Avellaneda,34.6611,58.3669,1905
+1975,Argentina,Independiente,Avellaneda,34.6611,58.3669,1905
+1976,Brazil,Cruzeiro,Belo Horizonte,19.9167,43.9345,1921
+1977,Argentina,Boca Juniors,Buenos AIres,34.6037,58.3816,1905
+1978,Argentina,Boca Juniors,Buenos AIres,34.6037,58.3816,1905
+1979,Paraguay,Olimpia (Asunción),Asuncion,25.2637,57.5759,1902
+1980,Uruguay,Nacional,Montevideo,34.9011,56.1645,1899
+1981,Brazil,Flamengo,Rio de Janeiro,22.9068,43.1729,1895
+1982,Uruguay,Peñarol,Montevideo,34.9011,56.1645,1891
+1983,Brazil,Grêmio,Porto Alegre,30.0346,51.2177,1903
+1984,Argentina,Independiente,Avellaneda,34.6611,58.3669,1905
+1985,Argentina,Argentinos Juniors,Buenos AIres,34.6037,58.3816,1904
+1986,Argentina,River Plate,Buenos AIres,34.6037,58.3816,1901
+1987,Uruguay,Peñarol,Montevideo,34.9011,56.1645,1891
+1988,Uruguay,Nacional,Montevideo,34.9011,56.1645,1899
+1989,Colombia,Atlético Nacional (Medellín),Medellin,6.2442,75.5812,1947
+1990,Paraguay,Olimpia (Asunción),Asuncion,25.2637,57.5759,1902
+1991,Chile,Colo Colo,Santiago,33.4489,70.6693,1925
+1992,Brazil,São Paulo,Sao Paulo,23.5505,46.6333,1930
+1993,Brazil,São Paulo,Sao Paulo,23.5505,46.6333,1930
+1994,Argentina,Vélez Sarsfield,Buenos AIres,34.6037,58.3816,1910
+1995,Brazil,Grêmio,Porto Alegre,30.0346,51.2177,1903
+1996,Argentina,River Plate,Buenos AIres,34.6037,58.3816,1901
+1997,Brazil,Cruzeiro,Belo Horizonte,19.9167,43.9345,1921
+1998,Brazil,Vasco da Gama,Rio de Janeiro,22.9068,43.1729,1898
+1999,Brazil,Palmeiras,Sao Paulo,23.5505,46.6333,1914
+2000,Argentina,Boca Juniors,Buenos AIres,34.6037,58.3816,1905
+2001,Argentina,Boca Juniors,Buenos AIres,34.6037,58.3816,1905
+2002,Paraguay,Olimpia (Asunción),Asuncion,25.2637,57.5759,1902
+2003,Argentina,Boca Juniors,Buenos AIres,34.6037,58.3816,1905
+2004,Colombia,Once Caldas (Manizales),Manizales,5.0689,75.5174,1961
+2005,Brazil,São Paulo,Sao Paulo,23.5505,46.6333,1930
+2006,Brazil,Internacional,Porto Alegre,30.0346,51.2177,1909
+2007,Argentina,Boca Juniors,Buenos AIres,34.6037,58.3816,1905
+2008,Ecuador,LDU (Quito),Quito,0.18,78.4678,1930
+2009,Argentina,Estudiantes,La Plata,34.9215,57.9545,1905
+2010,Brazil,Internacional,Porto Alegre,30.0346,51.2177,1909
+2011,Brazil,Santos,Sao Paulo,23.5505,46.6333,1912
+2012,Brazil,Corinthians,Sao Paulo,23.5505,46.6333,1910
+2013,Brazil,Atlético Mineiro (Belo Horizonte),Belo Horizonte,19.9167,43.9345,1908
+2014,Argentina,San Lorenzo de Almagro,Buenos AIres,34.6037,58.3816,1908
+2015,Argentina,River Plate,Buenos AIres,34.6037,58.3816,1901
+2016,Colombia,Atlético Nacional (Medellín),Medellin,6.2442,75.5812,1947
+2017,Brazil,Grêmio,Porto Alegre,30.0346,51.2177,1903
+2018,Argentina,River Plate,Buenos AIres,34.6037,58.3816,1901
+2019,Brazil,Flamengo,Rio de Janeiro,22.9068,43.1729,1895
+2020,Brazil,Palmeiras,Sao Paulo,23.5505,46.6333,1914
+2021,Brazil,Palmeiras,Sao Paulo,23.5505,46.6333,1914
+2022,Brazil,Flamengo,Rio de Janeiro,22.9068,43.1729,1895
+2023,Brazil,Fluminense,Rio de Janeiro,22.9068,43.1729,1902
+2024,Brazil,Botafogo,Rio de Janeiro,22.9068,43.1729,1904
+2025,Brazil,Flamengo,Rio de Janeiro,22.9068,43.1729,1895`;
+
+        // Parse CSV data
+        const parsedData = d3.csvParse(data);
+        
+        // Count by country
+        const countryCount = d3.rollup(parsedData, v => v.length, d => d.Country);
+        
+        // Count by city and gather club info
+        const cityData = d3.rollup(
+            parsedData,
+            v => ({
+                count: v.length,
+                clubs: d3.rollup(v, years => years.map(d => d.Year).sort(), d => d['Winner Club'])
+            }),
+            d => d.city
+        );
+        
+        // Get unique city coordinates
+        const cityCoords = new Map();
+        parsedData.forEach(d => {
+            if (!cityCoords.has(d.city)) {
+                cityCoords.set(d.city, {
+                    lat: +d['coordinate latitude'],
+                    lon: -Math.abs(+d['coordinates longitude']), // Convert to negative for Western hemisphere
+                    country: d.Country
+                });
+            }
+        });
+
+        // Map dimensions
+        const width = 1160;
+        const height = 800;
+
+        const svg = d3.select("#map")
+            .attr("width", width)
+            .attr("height", height);
+
+        // Tooltip
+        const tooltip = d3.select("body").append("div")
+            .attr("class", "tooltip")
+            .style("opacity", 0);
+
+        // Projection centered on South America
+        const projection = d3.geoMercator()
+            .center([-60, -15])
+            .scale(550)
+            .translate([width / 2, height / 2]);
+
+        const path = d3.geoPath().projection(projection);
+
+        // Color scale
+        const maxCount = d3.max([...countryCount.values()]);
+        const colorScale = d3.scaleSequential()
+            .domain([0, maxCount])
+            .interpolator(d3.interpolateBlues);
+
+        // Load TopoJSON data for South America
+        d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json").then(world => {
+            const countries = topojson.feature(world, world.objects.countries);
+            
+            // South American country codes
+            const southAmericaCodes = ['032', '068', '076', '152', '170', '218', '239', '328', '600', '604', '740', '858', '862'];
+            const countryNames = {
+                '032': 'Argentina',
+                '068': 'Bolivia',
+                '076': 'Brazil',
+                '152': 'Chile',
+                '170': 'Colombia',
+                '218': 'Ecuador',
+                '254': 'French Guiana',
+                '328': 'Guyana',
+                '600': 'Paraguay',
+                '604': 'Peru',
+                '740': 'Suriname',
+                '858': 'Uruguay',
+                '862': 'Venezuela'
+            };
+
+            // Draw countries
+            svg.append("g")
+                .selectAll("path")
+                .data(countries.features.filter(d => southAmericaCodes.includes(d.id)))
+                .enter()
+                .append("path")
+                .attr("class", "country")
+                .attr("d", path)
+                .attr("fill", d => {
+                    const name = countryNames[d.id];
+                    const count = countryCount.get(name) || 0;
+                    return count > 0 ? colorScale(count) : "#e0e0e0";
+                })
+                .on("mouseover", function(event, d) {
+                    const name = countryNames[d.id];
+                    const count = countryCount.get(name) || 0;
+                    
+                    if (count > 0) {
+                        tooltip.transition()
+                            .duration(200)
+                            .style("opacity", .95);
+                        tooltip.html(`
+                            <div class="tooltip-title">${name}</div>
+                            <div class="tooltip-content">
+                                Titles: ${count}<br>
+                                Percentage: ${((count / parsedData.length) * 100).toFixed(1)}%
+                            </div>
+                        `)
+                            .style("left", (event.pageX + 10) + "px")
+                            .style("top", (event.pageY - 28) + "px");
+                    }
+                })
+                .on("mouseout", function() {
+                    tooltip.transition()
+                        .duration(500)
+                        .style("opacity", 0);
+                });
+
+            // Circle size scale
+            const maxCityCount = d3.max([...cityData.values()].map(d => d.count));
+            const radiusScale = d3.scaleSqrt()
+                .domain([0, maxCityCount])
+                .range([0, 30]);
+
+            // Draw city circles
+            const cities = Array.from(cityData.entries()).map(([city, data]) => ({
+                city,
+                ...data,
+                ...cityCoords.get(city)
+            }));
+
+            svg.append("g")
+                .selectAll("circle")
+                .data(cities)
+                .enter()
+                .append("circle")
+                .attr("class", "city-circle")
+                .attr("cx", d => projection([d.lon, d.lat])[0])
+                .attr("cy", d => projection([d.lon, d.lat])[1])
+                .attr("r", d => radiusScale(d.count))
+                .on("mouseover", function(event, d) {
+                    tooltip.transition()
+                        .duration(200)
+                        .style("opacity", .95);
+                    
+                    let clubsList = '';
+                    d.clubs.forEach((years, club) => {
+                        clubsList += `<strong>${club}</strong>: ${years.join(', ')}<br>`;
+                    });
+                    
+                    tooltip.html(`
+                        <div class="tooltip-title">${d.city}</div>
+                        <div class="tooltip-content">
+                            Total Titles: ${d.count}<br><br>
+                            ${clubsList}
+                        </div>
+                    `)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", function() {
+                    tooltip.transition()
+                        .duration(500)
+                        .style("opacity", 0);
+                });
+
+            // Create legend
+            const legendData = Array.from(countryCount.entries())
+                .sort((a, b) => b[1] - a[1]);
+            
+            const legendItems = d3.select("#legend-items");
+            legendData.forEach(([country, count]) => {
+                legendItems.append("div")
+                    .attr("class", "legend-item")
+                    .html(`
+                        <span class="legend-color" style="background-color: ${colorScale(count)}"></span>
+                        <span>${country}: ${count} titles</span>
+                    `);
+            });
+        });
+    </script>
+</body>
+</html>
