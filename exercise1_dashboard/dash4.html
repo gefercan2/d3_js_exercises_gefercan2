@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Markets Dashboard</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/topojson.v3.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #121826;
+            --bg-tertiary: #1a2332;
+            --text-primary: #e8eaed;
+            --text-secondary: #9aa0a8;
+            --text-dim: #4a525c;
+            --accent-blue: #4a9eff;
+            --accent-red: #ff4a6e;
+            --accent-yellow: #ffa94a;
+            --border: #2a3442;
+            --grid: rgba(255, 255, 255, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        #container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Div 1 - Header */
+        #div1 {
+            height: 80px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            padding: 0 30px;
+            align-items: center;
+            gap: 40px;
+        }
+
+        #div1-1 {
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: var(--text-primary);
+        }
+
+        #div1-2, #div1-3, #div1-4 {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Div 2 - Main Charts */
+        #div2 {
+            flex: 1;
+            display: flex;
+            background: var(--bg-primary);
+            overflow: hidden;
+        }
+
+        #div2-1, #div2-2, #div2-3 {
+            flex: 1;
+            border-right: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #div2-3 {
+            border-right: none;
+        }
+
+        /* Div 3 - Footer */
+        #div3 {
+            height: 120px;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            display: flex;
+            padding: 20px 30px;
+            gap: 20px;
+            font-size: 11px;
+            line-height: 1.6;
+            color: var(--text-dim);
+        }
+
+        #div3 > div {
+            flex: 1;
+        }
+
+        /* Side Menu Button */
+        #menuBtn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 40px;
+            height: 40px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s ease;
+        }
+
+        #menuBtn span {
+            width: 20px;
+            height: 2px;
+            background: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        #menuBtn:hover {
+            background: var(--accent-blue);
+        }
+
+        /* Side Panel */
+        #div4-1 {
+            position: fixed;
+            left: -60%;
+            top: 0;
+            width: 60%;
+            height: 100vh;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            z-index: 999;
+            transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 80px 40px 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            overflow-y: auto;
+        }
+
+        #div4-1.open {
+            left: 0;
+        }
+
+        #div4-1 > div {
+            padding: 20px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            font-size: 12px;
+            line-height: 1.8;
+            color: var(--text-secondary);
+        }
+
+        /* Globe Styles */
+        #globe-container {
+            width: 100%;
+            height: calc(100% - 150px);
+        }
+
+        #info-box {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 150px;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            padding: 15px 20px;
+            font-size: 11px;
+            overflow-y: auto;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            color: var(--text-secondary);
+        }
+
+        .info-label {
+            color: var(--text-dim);
+        }
+
+        /* Scatter Plot Styles */
+        #scatter-container {
+            width: 100%;
+            height: calc(100% - 60px);
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            padding: 10px 20px;
+            display: flex;
+            gap: 30px;
+            align-items: center;
+            font-size: 11px;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .control-group label {
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-right: 5px;
+        }
+
+        input[type="radio"], input[type="checkbox"] {
+            margin-right: 3px;
+        }
+
+        /* Force Diagram Styles */
+        #force-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        svg {
+            display: block;
+        }
+
+        .city-label {
+            font-size: 10px;
+            fill: var(--text-dim);
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+
+        .city-label.selected {
+            fill: var(--text-primary);
+            font-weight: bold;
+        }
+
+        .globe-city {
+            fill: var(--accent-blue);
+            stroke: var(--bg-primary);
+            stroke-width: 0.5;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .globe-city.selected {
+            fill: var(--accent-yellow);
+            stroke: var(--accent-yellow);
+            stroke-width: 2;
+        }
+
+        .scatter-dot {
+            fill: #1a1a1a;
+            stroke: var(--text-dim);
+            stroke-width: 1;
+            cursor: pointer;
+        }
+
+        .scatter-dot.selected {
+            stroke: var(--accent-yellow);
+            stroke-width: 2;
+        }
+
+        .overlay-circle {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .force-node {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .force-node.selected {
+            stroke: var(--accent-yellow);
+            stroke-width: 3;
+        }
+
+        .force-link {
+            stroke: var(--border);
+            stroke-opacity: 0.3;
+            stroke-width: 1;
+        }
+
+        .axis line, .axis path {
+            stroke: var(--grid);
+        }
+
+        .axis text {
+            fill: var(--text-dim);
+            font-size: 10px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .grid line {
+            stroke: var(--grid);
+            stroke-opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div id="menuBtn">
+        <span></span>
+        <span></span>
+        <span></span>
+    </div>
+
+    <div id="div4-1">
+        <div>
+            <h3 style="color: var(--text-primary); margin-bottom: 10px;">Market Overview</h3>
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.
+        </div>
+        <div>
+            <h3 style="color: var(--text-primary); margin-bottom: 10px;">Trading Analysis</h3>
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
+        </div>
+        <div>
+            <h3 style="color: var(--text-primary); margin-bottom: 10px;">Risk Metrics</h3>
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+        </div>
+        <div>
+            <h3 style="color: var(--text-primary); margin-bottom: 10px;">Global Insights</h3>
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium.
+        </div>
+    </div>
+
+    <div id="container">
+        <div id="div1">
+            <div id="div1-1">GLOBAL MARKETS</div>
+            <div id="div1-2">LOCAL: <span id="local-time"></span></div>
+            <div id="div1-3">SELECTED: <span id="selected-time">--:--:--</span></div>
+            <div id="div1-4"><span id="selected-city">No city selected</span></div>
+        </div>
+
+        <div id="div2">
+            <div id="div2-1">
+                <div id="globe-container"></div>
+                <div id="info-box">
+                    <div style="color: var(--text-primary); margin-bottom: 8px; font-weight: bold;">CITY INFO</div>
+                    <div id="info-content">Select a city to view details</div>
+                </div>
+            </div>
+            <div id="div2-2">
+                <div id="scatter-container"></div>
+                <div id="controls">
+                    <div class="control-group">
+                        <label>YEAR:</label>
+                        <label><input type="radio" name="year" value="2010">2010</label>
+                        <label><input type="radio" name="year" value="2015">2015</label>
+                        <label><input type="radio" name="year" value="2020">2020</label>
+                        <label><input type="radio" name="year" value="2025" checked>2025</label>
+                    </div>
+                    <div class="control-group">
+                        <label>SHOW:</label>
+                        <label><input type="checkbox" id="show-volume" checked>VOLUME</label>
+                        <label><input type="checkbox" id="show-ytd" checked>YTD</label>
+                    </div>
+                </div>
+            </div>
+            <div id="div2-3">
+                <div id="force-container"></div>
+            </div>
+        </div>
+
+        <div id="div3">
+            <div>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.</div>
+            <div>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia.</div>
+            <div>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto.</div>
+        </div>
+    </div>
+
+    <script>
+        // Data
+        const csvData = `market,pe_2010,pe_2015,pe_2020,pe_2025,pb_2010,pb_2015,pb_2020,pb_2025,cap_2010,cap_2015,cap_2020,cap_2025,vol_2010,vol_2015,vol_2020,vol_2025,ytd_2010,ytd_2015,ytd_2020,ytd_2025
+New York NYSE,14,18,28,22,2.1,2.6,3.2,3.8,10,15,23,33,12,18,40,50,-3,2,-2,10
+New York Nasdaq,18,25,45,35,2.8,3.8,5.0,6.0,8,12,19,27,16,25,60,75,-1,5,2,18
+Shanghai,20,18,16,14,3.0,2.2,1.8,1.5,3.5,6.5,8,8.5,7,18,35,45,-15,50,2,-3
+Shenzhen,35,45,38,32,4.2,5.0,4.2,3.8,2.5,5.5,7,8,6,25,45,50,-10,80,12,2
+Tokyo,16,20,23,21,1.3,1.5,1.6,1.7,3.5,4.5,6.5,7,7,7,9,10,-7,15,0,8
+Paris,13,17,25,16,1.4,1.7,2.0,1.8,1.8,2.3,3.2,3.5,2.5,2.5,4,4,-7,15,-10,8
+Amsterdam,13,19,24,18,1.5,2.0,2.3,2.2,1.0,1.5,2.5,3.0,1.5,2.5,5,6,-5,20,-5,12
+London,11,16,20,12,1.6,1.8,2.0,1.8,3.5,4.5,3.5,3.5,3.5,4,5,5,-2,3,-15,5
+Frankfurt,13,20,28,16,1.3,1.8,2.1,1.7,1.8,2.2,2.8,3.0,2.5,2.5,4,4,-2,20,-5,12
+Zurich,16,20,25,20,2.2,2.7,3.4,3.6,1.3,1.8,2.3,2.8,1.5,1.5,2.5,2.5,0,7,0,7
+HongKong,13,12,13,10,1.7,1.4,1.2,1.1,2.5,3.5,6.5,5,2.5,4,6,5,-7,15,-10,0
+Mumbai BSE,19,22,30,24,2.8,3.3,3.8,3.8,1.0,1.3,1.8,2.5,1.0,1.5,3.5,5.0,7,8,-12,14
+Mumbai NSE,21,25,35,28,3.0,3.6,4.2,4.1,0.8,1.0,1.4,2.0,0.8,1.5,4.5,6.0,8,10,-10,18
+Taipei,14,16,23,24,1.7,1.9,2.5,2.8,0.9,1.1,1.8,2.3,1.5,2.5,5,6,0,10,12,20
+Toronto,17,20,25,20,2.0,2.1,2.3,2.3,1.8,2.0,2.8,3.2,1.5,1.5,2.5,2.5,2,0,-15,8
+Seoul,11,12,14,12,1.2,1.1,1.3,1.1,1.1,1.3,2.0,2.2,2.5,3.5,6,6,-2,10,2,12
+Riyadh,13,16,30,22,2.2,2.5,3.0,2.8,0.4,0.5,2.2,3.0,0.8,0.8,1.5,2.2,0,0,-5,10
+Sydney,14,18,23,19,2.0,2.3,2.5,2.4,1.3,1.6,2.3,2.8,1.2,1.8,2.5,2.5,-2,2,-15,8
+Johannesburg,13,17,20,15,2.0,2.2,2.3,2.0,0.9,1.0,1.2,1.3,0.8,0.8,1.5,1.5,0,2,-5,8
+SaoPaulo,12,14,18,10,1.7,1.5,1.8,1.5,1.5,1.0,1.3,1.8,1.2,1.5,3,3,-5,0,-20,15
+Helsinki,13,17,23,16,1.6,1.8,2.3,2.0,0.3,0.4,0.7,0.8,0.5,0.8,1.2,1.5,-7,15,-10,12
+Oslo,11,14,18,12,1.5,1.6,1.9,1.7,0.3,0.4,0.6,0.8,0.5,0.8,1.2,1.5,-2,5,-10,8
+Stockholm,16,23,28,22,2.1,2.5,2.8,2.6,0.7,1.0,1.5,1.8,1.5,2.5,4,4,0,20,-5,14
+Copenhagen,18,25,35,30,2.4,3.2,4.2,4.8,0.5,0.8,1.5,2.0,0.8,1.5,2.5,3,5,25,12,22`;
+
+        // City coordinates
+        const cityCoords = {
+            "New York NYSE": { lat: 40.7128, lon: -74.0060, tz: "America/New_York" },
+            "New York Nasdaq": { lat: 40.7128, lon: -74.0060, tz: "America/New_York" },
+            "Shanghai": { lat: 31.2304, lon: 121.4737, tz: "Asia/Shanghai" },
+            "Shenzhen": { lat: 22.5431, lon: 114.0579, tz: "Asia/Shanghai" },
+            "Tokyo": { lat: 35.6762, lon: 139.6503, tz: "Asia/Tokyo" },
+            "Paris": { lat: 48.8566, lon: 2.3522, tz: "Europe/Paris" },
+            "Amsterdam": { lat: 52.3676, lon: 4.9041, tz: "Europe/Amsterdam" },
+            "London": { lat: 51.5074, lon: -0.1278, tz: "Europe/London" },
+            "Frankfurt": { lat: 50.1109, lon: 8.6821, tz: "Europe/Berlin" },
+            "Zurich": { lat: 47.3769, lon: 8.5417, tz: "Europe/Zurich" },
+            "HongKong": { lat: 22.3193, lon: 114.1694, tz: "Asia/Hong_Kong" },
+            "Mumbai BSE": { lat: 19.0760, lon: 72.8777, tz: "Asia/Kolkata" },
+            "Mumbai NSE": { lat: 19.0760, lon: 72.8777, tz: "Asia/Kolkata" },
+            "Taipei": { lat: 25.0330, lon: 121.5654, tz: "Asia/Taipei" },
+            "Toronto": { lat: 43.6532, lon: -79.3832, tz: "America/Toronto" },
+            "Seoul": { lat: 37.5665, lon: 126.9780, tz: "Asia/Seoul" },
+            "Riyadh": { lat: 24.7136, lon: 46.6753, tz: "Asia/Riyadh" },
+            "Sydney": { lat: -33.8688, lon: 151.2093, tz: "Australia/Sydney" },
+            "Johannesburg": { lat: -26.2041, lon: 28.0473, tz: "Africa/Johannesburg" },
+            "SaoPaulo": { lat: -23.5505, lon: -46.6333, tz: "America/Sao_Paulo" },
+            "Helsinki": { lat: 60.1695, lon: 24.9354, tz: "Europe/Helsinki" },
+            "Oslo": { lat: 59.9139, lon: 10.7522, tz: "Europe/Oslo" },
+            "Stockholm": { lat: 59.3293, lon: 18.0686, tz: "Europe/Stockholm" },
+            "Copenhagen": { lat: 55.6761, lon: 12.5683, tz: "Europe/Copenhagen" }
+        };
+
+        // Parse data
+        const data = d3.csvParse(csvData, d => ({
+            market: d.market,
+            pe_2010: +d.pe_2010, pe_2015: +d.pe_2015, pe_2020: +d.pe_2020, pe_2025: +d.pe_2025,
+            pb_2010: +d.pb_2010, pb_2015: +d.pb_2015, pb_2020: +d.pb_2020, pb_2025: +d.pb_2025,
+            cap_2010: +d.cap_2010, cap_2015: +d.cap_2015, cap_2020: +d.cap_2020, cap_2025: +d.cap_2025,
+            vol_2010: +d.vol_2010, vol_2015: +d.vol_2015, vol_2020: +d.vol_2020, vol_2025: +d.vol_2025,
+            ytd_2010: +d.ytd_2010, ytd_2015: +d.ytd_2015, ytd_2020: +d.ytd_2020, ytd_2025: +d.ytd_2025,
+            ...cityCoords[d.market]
+        }));
+
+        // State
+        let selectedCity = null;
+        let currentYear = 2025;
+        let showVolume = true;
+        let showYTD = true;
+        let autoRotate = true;
+
+        // Time updates
+        function updateTimes() {
+            const now = new Date();
+            document.getElementById('local-time').textContent = now.toLocaleTimeString('en-US', { hour12: false });
+            
+            if (selectedCity && selectedCity.tz) {
+                const cityTime = now.toLocaleTimeString('en-US', { 
+                    timeZone: selectedCity.tz, 
+                    hour12: false 
+                });
+                document.getElementById('selected-time').textContent = cityTime;
+            }
+        }
+        setInterval(updateTimes, 1000);
+        updateTimes();
+
+        // Side menu
+        document.getElementById('menuBtn').addEventListener('click', () => {
+            document.getElementById('div4-1').classList.toggle('open');
+        });
+
+        // Globe
+        const globeWidth = document.getElementById('globe-container').clientWidth;
+        const globeHeight = document.getElementById('globe-container').clientHeight;
+        const projection = d3.geoOrthographic()
+            .scale(Math.min(globeWidth, globeHeight) / 2.5)
+            .translate([globeWidth / 2, globeHeight / 2])
+            .clipAngle(90);
+
+        const path = d3.geoPath(projection);
+        const globeSvg = d3.select('#globe-container')
+            .append('svg')
+            .attr('width', globeWidth)
+            .attr('height', globeHeight);
+
+        const graticule = d3.geoGraticule();
+        let currentRotation = [0, -20];
+
+        // Load world data
+        d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(world => {
+            const countries = topojson.feature(world, world.objects.countries);
+
+            globeSvg.append('path')
+                .datum({ type: 'Sphere' })
+                .attr('class', 'sphere')
+                .attr('d', path)
+                .attr('fill', '#0f1419')
+                .attr('stroke', 'none');
+
+            globeSvg.append('path')
+                .datum(graticule)
+                .attr('class', 'graticule')
+                .attr('d', path)
+                .attr('fill', 'none')
+                .attr('stroke', 'rgba(255,255,255,0.05)')
+                .attr('stroke-width', 0.5);
+
+            globeSvg.append('g')
+                .selectAll('path')
+                .data(countries.features)
+                .join('path')
+                .attr('d', path)
+                .attr('fill', '#1a2332')
+                .attr('stroke', '#2a3442')
+                .attr('stroke-width', 0.5);
+
+            // City markers
+            const cityGroup = globeSvg.append('g').attr('class', 'cities');
+            
+            // Market cap circles
+            const capScale = d3.scaleSqrt()
+                .domain([0, d3.max(data, d => d[`cap_${currentYear}`])])
+                .range([0, 30]);
+
+            data.forEach(d => {
+                const coords = projection([d.lon, d.lat]);
+                if (coords) {
+                    cityGroup.append('circle')
+                        .datum(d)
+                        .attr('class', 'globe-city')
+                        .attr('cx', coords[0])
+                        .attr('cy', coords[1])
+                        .attr('r', capScale(d[`cap_${currentYear}`]))
+                        .on('click', (event, city) => selectCity(city));
+
+                    cityGroup.append('text')
+                        .datum(d)
+                        .attr('class', 'city-label')
+                        .attr('x', coords[0])
+                        .attr('y', coords[1] - capScale(d[`cap_${currentYear}`]) - 5)
+                        .attr('text-anchor', 'middle')
+                        .text(d.market.split(' ')[0])
+                        .style('opacity', 0.3);
+                }
+            });
+
+            // Rotation
+            function rotate() {
+                if (autoRotate) {
+                    currentRotation[0] += 0.2;
+                    projection.rotate(currentRotation);
+                    globeSvg.selectAll('path').attr('d', path);
+                    
+                    data.forEach((d, i) => {
+                        const coords = projection([d.lon, d.lat]);
+                        if (coords) {
+                            d3.selectAll('.globe-city').filter((city, j) => j === i)
+                                .attr('cx', coords[0])
+                                .attr('cy', coords[1]);
+                            d3.selectAll('.city-label').filter((city, j) => j === i)
+                                .attr('x', coords[0])
+                                .attr('y', coords[1] - capScale(d[`cap_${currentYear}`]) - 5);
+                        }
+                    });
+                }
+                requestAnimationFrame(rotate);
+            }
+            rotate();
+
+            // Drag to rotate
+            const drag = d3.drag()
+                .on('start', () => autoRotate = false)
+                .on('drag', (event) => {
+                    currentRotation[0] += event.dx * 0.5;
+                    currentRotation[1] -= event.dy * 0.5;
+                    currentRotation[1] = Math.max(-90, Math.min(90, currentRotation[1]));
+                    projection.rotate(currentRotation);
+                    globeSvg.selectAll('path').attr('d', path);
+                    
+                    data.forEach((d, i) => {
+                        const coords = projection([d.lon, d.lat]);
+                        if (coords) {
+                            d3.selectAll('.globe-city').filter((city, j) => j === i)
+                                .attr('cx', coords[0])
+                                .attr('cy', coords[1]);
+                            d3.selectAll('.city-label').filter((city, j) => j === i)
+                                .attr('x', coords[0])
+                                .attr('y', coords[1] - capScale(d[`cap_${currentYear}`]) - 5);
+                        }
+                    });
+                });
+
+            globeSvg.call(drag);
+        });
+
+        // Scatter Plot
+        const scatterMargin = { top: 20, right: 60, bottom: 20, left: 60 };
+        const scatterWidth = document.getElementById('scatter-container').clientWidth - scatterMargin.left - scatterMargin.right;
+        const scatterHeight = document.getElementById('scatter-container').clientHeight - scatterMargin.top - scatterMargin.bottom;
+
+        const scatterSvg = d3.select('#scatter-container')
+            .append('svg')
+            .attr('width', scatterWidth + scatterMargin.left + scatterMargin.right)
+            .attr('height', scatterHeight + scatterMargin.top + scatterMargin.bottom)
+            .append('g')
+            .attr('transform', `translate(${scatterMargin.left},${scatterMargin.top})`);
+
+        function updateScatter() {
+            scatterSvg.selectAll('*').remove();
+
+            const xScale = d3.scaleLinear()
+                .domain([0, d3.max(data, d => d[`pb_${currentYear}`]) * 1.1])
+                .range([0, scatterWidth]);
+
+            const yScale = d3.scaleLinear()
+                .domain([0, d3.max(data, d => d[`pe_${currentYear}`]) * 1.1])
+                .range([scatterHeight, 0]);
+
+            const volScale = d3.scaleSqrt()
+                .domain([0, d3.max(data, d => d[`vol_${currentYear}`])])
+                .range([0, 20]);
+
+            const ytdScale = d3.scaleSqrt()
+                .domain([0, d3.max(data, d => Math.abs(d[`ytd_${currentYear}`]))])
+                .range([0, 15]);
+
+            // Grid
+            scatterSvg.append('g')
+                .attr('class', 'grid')
+                .call(d3.axisLeft(yScale).tickSize(-scatterWidth).tickFormat(''));
+
+            scatterSvg.append('g')
+                .attr('class', 'grid')
+                .attr('transform', `translate(0,${scatterHeight})`)
+                .call(d3.axisBottom(xScale).tickSize(-scatterHeight).tickFormat(''));
+
+            // Axes
+            scatterSvg.append('g')
+                .attr('class', 'axis')
+                .attr('transform', `translate(${scatterWidth},0)`)
+                .call(d3.axisRight(yScale));
+
+            scatterSvg.append('g')
+                .attr('class', 'axis')
+                .attr('transform', `translate(0,${scatterHeight})`)
+                .call(d3.axisBottom(xScale));
+
+            // Points
+            data.forEach(d => {
+                const x = xScale(d[`pb_${currentYear}`]);
+                const y = yScale(d[`pe_${currentYear}`]);
+
+                // Base dot
+                scatterSvg.append('circle')
+                    .datum(d)
+                    .attr('class', 'scatter-dot')
+                    .attr('cx', x)
+                    .attr('cy', y)
+                    .attr('r', 3)
+                    .on('click', (event, city) => selectCity(city));
+
+                // Volume overlay
+                if (showVolume) {
+                    scatterSvg.append('circle')
+                        .datum(d)
+                        .attr('class', 'overlay-circle')
+                        .attr('cx', x)
+                        .attr('cy', y)
+                        .attr('r', volScale(d[`vol_${currentYear}`]))
+                        .attr('fill', 'none')
+                        .attr('stroke', 'rgba(74, 158, 255, 0.6)')
+                        .attr('stroke-width', 2)
+                        .on('click', (event, city) => selectCity(city));
+                }
+
+                // YTD overlay
+                if (showYTD) {
+                    scatterSvg.append('circle')
+                        .datum(d)
+                        .attr('class', 'overlay-circle')
+                        .attr('cx', x)
+                        .attr('cy', y)
+                        .attr('r', ytdScale(Math.abs(d[`ytd_${currentYear}`])))
+                        .attr('fill', 'none')
+                        .attr('stroke', d[`ytd_${currentYear}`] >= 0 ? 'rgba(74, 255, 78, 0.6)' : 'rgba(255, 74, 110, 0.6)')
+                        .attr('stroke-width', 2)
+                        .on('click', (event, city) => selectCity(city));
+                }
+
+                // Label
+                scatterSvg.append('text')
+                    .datum(d)
+                    .attr('class', 'city-label')
+                    .attr('x', x + 8)
+                    .attr('y', y + 3)
+                    .text(d.market.split(' ')[0])
+                    .style('opacity', 0.3);
+            });
+        }
+
+        updateScatter();
+
+        // Force Diagram
+        const forceWidth = document.getElementById('force-container').clientWidth;
+        const forceHeight = document.getElementById('force-container').clientHeight;
+
+        const forceSvg = d3.select('#force-container')
+            .append('svg')
+            .attr('width', forceWidth)
+            .attr('height', forceHeight);
+
+        function updateForce() {
+            forceSvg.selectAll('*').remove();
+
+            const nodes = data.map(d => ({
+                ...d,
+                ratio: d[`cap_${currentYear}`] / d[`vol_${currentYear}`],
+                radius: Math.sqrt(d[`cap_${currentYear}`] / d[`vol_${currentYear}`]) * 15
+            }));
+
+            const links = [];
+            for (let i = 0; i < nodes.length; i++) {
+                for (let j = i + 1; j < nodes.length; j++) {
+                    if (Math.random() > 0.7) {
+                        links.push({ source: i, target: j });
+                    }
+                }
+            }
+
+            const simulation = d3.forceSimulation(nodes)
+                .force('link', d3.forceLink(links).distance(100))
+                .force('charge', d3.forceManyBody().strength(-100))
+                .force('center', d3.forceCenter(forceWidth / 2, forceHeight / 2))
+                .force('collision', d3.forceCollide().radius(d => d.radius + 5));
+
+            const link = forceSvg.append('g')
+                .selectAll('line')
+                .data(links)
+                .join('line')
+                .attr('class', 'force-link');
+
+            const node = forceSvg.append('g')
+                .selectAll('g')
+                .data(nodes)
+                .join('g')
+                .call(d3.drag()
+                    .on('start', dragstarted)
+                    .on('drag', dragged)
+                    .on('end', dragended));
+
+            node.append('circle')
+                .attr('class', 'force-node')
+                .attr('r', d => d.radius)
+                .attr('fill', 'var(--accent-blue)')
+                .attr('stroke', 'var(--bg-primary)')
+                .attr('stroke-width', 2)
+                .on('click', (event, d) => selectCity(d));
+
+            node.append('text')
+                .attr('text-anchor', 'middle')
+                .attr('dy', 5)
+                .attr('fill', 'var(--text-primary)')
+                .attr('font-size', '10px')
+                .attr('font-family', 'Courier New, monospace')
+                .text(d => d.ratio.toFixed(1));
+
+            simulation.on('tick', () => {
+                link
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+
+                node.attr('transform', d => `translate(${d.x},${d.y})`);
+            });
+
+            function dragstarted(event) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                event.subject.fx = event.subject.x;
+                event.subject.fy = event.subject.y;
+            }
+
+            function dragged(event) {
+                event.subject.fx = event.x;
+                event.subject.fy = event.y;
+            }
+
+            function dragended(event) {
+                if (!event.active) simulation.alphaTarget(0);
+                event.subject.fx = null;
+                event.subject.fy = null;
+            }
+        }
+
+        updateForce();
+
+        // Selection
+        function selectCity(city) {
+            selectedCity = city;
+            document.getElementById('selected-city').textContent = city.market;
+            updateTimes();
+
+            // Update info box
+            const infoHTML = `
+                <div class="info-row"><span class="info-label">MARKET:</span> ${city.market}</div>
+                <div class="info-row"><span class="info-label">P/E ${currentYear}:</span> ${city[`pe_${currentYear}`]}</div>
+                <div class="info-row"><span class="info-label">P/B ${currentYear}:</span> ${city[`pb_${currentYear}`]}</div>
+                <div class="info-row"><span class="info-label">CAP ${currentYear}:</span> ${city[`cap_${currentYear}`]}T</div>
+                <div class="info-row"><span class="info-label">VOL ${currentYear}:</span> ${city[`vol_${currentYear}`]}T</div>
+                <div class="info-row"><span class="info-label">YTD ${currentYear}:</span> ${city[`ytd_${currentYear}`]}%</div>
+            `;
+            document.getElementById('info-content').innerHTML = infoHTML;
+
+            // Highlight across charts
+            d3.selectAll('.globe-city').classed('selected', d => d.market === city.market);
+            d3.selectAll('.scatter-dot').classed('selected', d => d.market === city.market);
+            d3.selectAll('.force-node').classed('selected', d => d.market === city.market);
+            d3.selectAll('.city-label').classed('selected', d => d.market === city.market)
+                .style('opacity', d => d.market === city.market ? 1 : 0.3);
+
+            // Rotate globe to city
+            autoRotate = false;
+            const targetRotation = [-city.lon, -city.lat];
+            d3.transition()
+                .duration(1500)
+                .tween('rotate', () => {
+                    const interpolate = d3.interpolate(currentRotation, targetRotation);
+                    return t => {
+                        currentRotation = interpolate(t);
+                        projection.rotate(currentRotation);
+                        d3.selectAll('.graticule').attr('d', path);
+                        d3.selectAll('.sphere').attr('d', path);
+                        d3.select('#globe-container svg g').selectAll('path').attr('d', path);
+                        
+                        data.forEach((d, i) => {
+                            const coords = projection([d.lon, d.lat]);
+                            if (coords) {
+                                d3.selectAll('.globe-city').filter((_, j) => j === i)
+                                    .attr('cx', coords[0])
+                                    .attr('cy', coords[1]);
+                                d3.selectAll('.city-label').filter((_, j) => j === i)
+                                    .attr('x', coords[0])
+                                    .attr('y', coords[1] - 10);
+                            }
+                        });
+                    };
+                });
+        }
+
+        // Controls
+        document.querySelectorAll('input[name="year"]').forEach(radio => {
+            radio.addEventListener('change', e => {
+                currentYear = parseInt(e.target.value);
+                updateScatter();
+                updateForce();
+            });
+        });
+
+        document.getElementById('show-volume').addEventListener('change', e => {
+            showVolume = e.target.checked;
+            updateScatter();
+        });
+
+        document.getElementById('show-ytd').addEventListener('change', e => {
+            showYTD = e.target.checked;
+            updateScatter();
+        });
+    </script>
+</body>
+</html>
