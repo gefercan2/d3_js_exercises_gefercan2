@@ -14,12 +14,13 @@ https://d3-graph-gallery.com/graph/shape.html <br>
 https://d3-graph-gallery.com/interactivity.html  <br>
 https://d3-graph-gallery.com/custom.html <br>
 
-Among the places rthat work with d3 are Flourish and RawGraph:
+Among the places rthat work with d3 are Flourish and RawGraph: <br>
 https://flourish.studio/, https://www.rawgraphs.io/<br>
 Here you will find a set of boilerplate files made with ChatGPT.<br>
 Also some info on graphs types from their repository:<br>
 for a samples gallery:<br> https://observablehq.com/@d3/gallery <br>
 other samples: <br>
+denisemauldin.github.io/d3-timeline/ <br>
 https://observablehq.com/@d3/parallel-sets <br>
 https://observablehq.com/@tezzutezzu/world-history-timelinehttps://observablehq.com/@tezzutezzu/world-history-timeline <br>
 https://d3js.org/d3-hierarchy/hierarchy, <br>
