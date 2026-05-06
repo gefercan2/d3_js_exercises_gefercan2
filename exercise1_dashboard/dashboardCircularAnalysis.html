@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lexia — Concentric Text Analysis</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #e8e6e0;
+    --text2: #8a8880;
+    --text3: #4a4848;
+    --accent: #c8a96e;
+    --accent2: #7eb8c9;
+    --accent3: #9b7fc7;
+    --accent4: #c97e7e;
+    --green: #7ec99b;
+    --radius: 10px;
+    --panel-w: 280px;
+    --zoom: 1;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    width: 100%;
+  }
+
+  /* ── OUTER SCROLL CONTAINER ── */
+  #scroll-stage {
+    width: 100%;
+    height: 100vh;
+    overflow-x: auto;
+    overflow-y: hidden;
+    position: relative;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
+  }
+  #scroll-stage::-webkit-scrollbar { height: 6px; }
+  #scroll-stage::-webkit-scrollbar-track { background: transparent; }
+  #scroll-stage::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  /* ── CANVAS (scrollable width) ── */
+  #canvas {
+    position: relative;
+    width:100%;
+    height: 100vh;
+    min-height: 800px;
+  }
+
+  /* ── LAYER 1: UI (z-index 10) ── */
+  #layer-ui {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+  }
+  #layer-ui > * { pointer-events: all; }
+
+  /* ── LAYER 2: CHART (z-index 1) ── */
+  #layer-chart {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── UPLOAD PANEL ── */
+  #upload-panel {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    width: var(--panel-w);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .panel-block {
+    background: rgba(17,17,24,0.92);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    backdrop-filter: blur(16px);
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 0.5px solid transparent;
+    transition: border-color 0.3s;
+  }
+  .panel-header.open { border-color: var(--border); }
+
+  .panel-title {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .chevron {
+    font-size: 10px;
+    color: var(--text3);
+    transition: transform 0.3s;
+  }
+  .chevron.open { transform: rotate(180deg); }
+
+  .panel-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1);
+  }
+  .panel-body.open { max-height: 400px; }
+
+  .panel-inner { padding: 14px; }
+
+  /* Upload button */
+  .upload-btn {
+    width: 100%;
+    padding: 10px;
+    background: rgba(200,169,110,0.12);
+    border: 0.5px dashed rgba(200,169,110,0.4);
+    border-radius: 7px;
+    color: var(--accent);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    letter-spacing: 0.06em;
+  }
+  .upload-btn:hover {
+    background: rgba(200,169,110,0.2);
+    border-color: rgba(200,169,110,0.7);
+  }
+
+  #file-input { display: none; }
+
+  /* Progress bar */
+  #progress-wrap {
+    margin-top: 10px;
+    display: none;
+  }
+  .progress-label {
+    font-size: 10px;
+    color: var(--text2);
+    margin-bottom: 5px;
+    letter-spacing: 0.05em;
+  }
+  .progress-track {
+    height: 3px;
+    background: var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    transition: width 0.1s linear;
+  }
+
+  /* Uploaded files list */
+  #files-list {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    color: var(--text2);
+    padding: 6px 8px;
+    background: var(--border);
+    border-radius: 5px;
+  }
+  .file-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    flex-shrink: 0;
+  }
+  .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── MULTISTEP CONNECTOR ── */
+  #step-connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0;
+    margin: 0 auto;
+    width: 20px;
+    position: relative;
+  }
+
+  .step-line {
+    width: 1px;
+    height: 24px;
+    background: linear-gradient(to bottom, var(--accent), var(--accent3));
+    position: relative;
+  }
+
+  .step-node {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 1px solid var(--accent3);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    color: var(--accent3);
+    position: relative;
+    z-index: 1;
+  }
+  .step-node.active {
+    background: var(--accent3);
+    color: var(--bg);
+  }
+  .step-node.done {
+    background: var(--green);
+    border-color: var(--green);
+    color: var(--bg);
+  }
+
+  /* Analyse block */
+  #analyse-block .panel-inner { display: flex; flex-direction: column; gap: 10px; }
+
+  .analyse-file {
+    font-size: 10px;
+    color: var(--text2);
+    letter-spacing: 0.04em;
+  }
+  .analyse-filename {
+    color: var(--accent2);
+    font-style: italic;
+  }
+
+  .analyse-btn {
+    width: 100%;
+    padding: 9px;
+    background: rgba(126,184,201,0.15);
+    border: 0.5px solid rgba(126,184,201,0.4);
+    border-radius: 7px;
+    color: var(--accent2);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  .analyse-btn:hover { background: rgba(126,184,201,0.28); }
+  .analyse-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Collapse all btn */
+  #collapse-btn {
+    margin-top: 8px;
+    width: 100%;
+    padding: 6px;
+    background: transparent;
+    border: 0.5px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text3);
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    display: none;
+    transition: all 0.2s;
+  }
+  #collapse-btn:hover { color: var(--text2); border-color: var(--border2); }
+
+  /* ── ZOOM CONTROLS ── */
+  #zoom-panel {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: rgba(17,17,24,0.92);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    backdrop-filter: blur(16px);
+    overflow: hidden;
+  }
+  .zoom-btn {
+    width: 36px; height: 36px;
+    background: transparent;
+    border: none;
+    color: var(--text2);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    font-family: 'DM Mono', monospace;
+  }
+  .zoom-btn:hover { background: var(--border); color: var(--accent); }
+
+  .zoom-sep { height: 0.5px; background: var(--border); }
+
+  #zoom-label {
+    font-size: 9px;
+    color: var(--text3);
+    text-align: center;
+    padding: 4px 0;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── CHART SVG ── */
+  #chart-svg { overflow: visible; }
+
+  /* ── TOOLTIP ── */
+  #tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: rgba(17,17,24,0.96);
+    border: 0.5px solid var(--border2);
+    border-radius: 8px;
+    padding: 10px 13px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    max-width: 240px;
+    line-height: 1.6;
+    backdrop-filter: blur(12px);
+    z-index: 9999;
+    display: none;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .tt-label {
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .tt-value { color: var(--text); }
+  .tt-sub { color: var(--text2); font-size: 10px; margin-top: 3px; }
+
+  /* ── LEGEND ── */
+  #legend {
+    position: absolute;
+    bottom: 24px;
+    right: 20px;
+    background: rgba(17,17,24,0.88);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    backdrop-filter: blur(12px);
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 9px;
+    color: var(--text2);
+    letter-spacing: 0.06em;
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .legend-ring {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    border: 2px solid;
+    flex-shrink: 0;
+  }
+
+  /* ── EMPTY STATE ── */
+  #empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    gap: 12px;
+  }
+  .empty-ring {
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    border: 0.5px dashed rgba(255,255,255,0.08);
+    position: absolute;
+    animation: pulse-ring 4s ease-in-out infinite;
+  }
+  .empty-ring:nth-child(2) { width: 280px; height: 280px; animation-delay: 0.8s; }
+  .empty-ring:nth-child(3) { width: 380px; height: 380px; animation-delay: 1.6s; }
+  .empty-ring:nth-child(4) { width: 480px; height: 480px; animation-delay: 2.4s; }
+  @keyframes pulse-ring {
+    0%,100% { opacity: 0.3; }
+    50% { opacity: 0.7; }
+  }
+  .empty-label {
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    z-index: 1;
+  }
+  .empty-sub {
+    font-family: 'Fraunces', serif;
+    font-size: 13px;
+    color: rgba(255,255,255,0.12);
+    font-style: italic;
+    z-index: 1;
+  }
+
+  /* ── ANALYSIS RUNNING INDICATOR ── */
+  #analysis-indicator {
+    position: absolute;
+    bottom: 24px;
+    left: 20px;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    color: var(--text2);
+    letter-spacing: 0.08em;
+  }
+  .spinner {
+    width: 14px; height: 14px;
+    border: 1.5px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+</style>
+</head>
+<body>
+
+<div id="scroll-stage">
+  <div id="canvas">
+
+    <!-- LAYER 2: CHART (bottom) -->
+    <div id="layer-chart">
+      <div id="empty-state">
+        <div class="empty-ring"></div>
+        <div class="empty-ring"></div>
+        <div class="empty-ring"></div>
+        <div class="empty-ring"></div>
+        <span class="empty-label">Upload a text file to begin</span>
+        <span class="empty-sub">Concentric analysis will render here</span>
+      </div>
+      <svg id="chart-svg"></svg>
+    </div>
+
+    <!-- LAYER 1: UI (top) -->
+    <div id="layer-ui">
+
+      <!-- Upload Panel -->
+      <div id="upload-panel">
+
+        <!-- Block A: Upload -->
+        <div class="panel-block" id="block-upload">
+          <div class="panel-header open" id="header-upload" onclick="toggleBlock('upload')">
+            <span class="panel-title">▲ Upload corpus</span>
+            <span class="chevron open" id="chev-upload">▾</span>
+          </div>
+          <div class="panel-body open" id="body-upload">
+            <div class="panel-inner">
+              <button class="upload-btn" onclick="document.getElementById('file-input').click()">
+                ＋ select .txt / .md file
+              </button>
+              <input type="file" id="file-input" accept=".txt,.md,.csv" multiple>
+
+              <div id="progress-wrap">
+                <div class="progress-label" id="progress-label">reading…</div>
+                <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+              </div>
+
+              <div id="files-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Multistep connector -->
+        <div id="step-connector" style="display:none">
+          <div class="step-line"></div>
+          <div class="step-node" id="step1">1</div>
+          <div class="step-line"></div>
+          <div class="step-node" id="step2">2</div>
+          <div class="step-line"></div>
+        </div>
+
+        <!-- Block B: Analyse -->
+        <div class="panel-block" id="block-analyse" style="display:none">
+          <div class="panel-header" id="header-analyse" onclick="toggleBlock('analyse')">
+            <span class="panel-title" style="color:var(--accent2)">▲ Ready to analyse</span>
+            <span class="chevron" id="chev-analyse">▾</span>
+          </div>
+          <div class="panel-body" id="body-analyse">
+            <div class="panel-inner" id="analyse-block">
+              <div id="analyse-files-info" class="analyse-file"></div>
+              <button class="analyse-btn" id="analyse-btn" onclick="runAnalysis()">
+                ◎ run analysis
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <button id="collapse-btn" onclick="collapseAll()">↑ collapse panels</button>
+      </div>
+
+      <!-- Zoom Controls -->
+      <div id="zoom-panel">
+        <button class="zoom-btn" onclick="zoomChange(0.15)" title="Zoom in">+</button>
+        <div class="zoom-sep"></div>
+        <div id="zoom-label">100%</div>
+        <div class="zoom-sep"></div>
+        <button class="zoom-btn" onclick="zoomChange(-0.15)" title="Zoom out">−</button>
+        <div class="zoom-sep"></div>
+        <button class="zoom-btn" onclick="zoomReset()" title="Reset" style="font-size:12px">⟳</button>
+      </div>
+
+      <!-- Legend -->
+      <div id="legend" style="display:none">
+        <div class="legend-row"><div class="legend-dot" style="background:var(--accent)"></div>C1 topic bubbles</div>
+        <div class="legend-row"><div class="legend-ring" style="border-color:var(--accent2)"></div>C2 paragraph sequence</div>
+        <div class="legend-row"><div class="legend-dot" style="background:var(--accent3)"></div>C3 word occurrences</div>
+        <div class="legend-row"><div class="legend-dot" style="background:var(--accent4)"></div>C4 citations</div>
+      </div>
+
+      <!-- Analysis indicator -->
+      <div id="analysis-indicator">
+        <div class="spinner"></div>
+        <span id="analysis-label">computing…</span>
+      </div>
+
+    </div><!-- /layer-ui -->
+
+  </div><!-- /canvas -->
+</div><!-- /scroll-stage -->
+
+<!-- Tooltip -->
+<div id="tooltip"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let uploadedFiles = [];
+let corpusData = null;
+let currentZoom = 1;
+let chartGroup = null;
+let svgEl = null;
+
+// ═══════════════════════════════════════════
+// PANEL TOGGLE
+// ═══════════════════════════════════════════
+function toggleBlock(id) {
+  const body = document.getElementById('body-' + id);
+  const chev = document.getElementById('chev-' + id);
+  const hdr  = document.getElementById('header-' + id);
+  const open = body.classList.toggle('open');
+  chev.classList.toggle('open', open);
+  hdr.classList.toggle('open', open);
+}
+
+function collapseAll() {
+  ['upload','analyse'].forEach(id => {
+    const body = document.getElementById('body-' + id);
+    const chev = document.getElementById('chev-' + id);
+    const hdr  = document.getElementById('header-' + id);
+    if (body) { body.classList.remove('open'); chev.classList.remove('open'); hdr.classList.remove('open'); }
+  });
+}
+
+// ═══════════════════════════════════════════
+// FILE UPLOAD
+// ═══════════════════════════════════════════
+document.getElementById('file-input').addEventListener('change', function(e) {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+  files.forEach(f => readFile(f));
+  e.target.value = '';
+});
+
+function readFile(file) {
+  const pw = document.getElementById('progress-wrap');
+  const pf = document.getElementById('progress-fill');
+  const pl = document.getElementById('progress-label');
+  pw.style.display = 'block';
+  pl.textContent = 'reading ' + file.name + '…';
+  pf.style.width = '0%';
+
+  let prog = 0;
+  const interval = setInterval(() => {
+    prog += Math.random() * 18 + 8;
+    pf.style.width = Math.min(prog, 90) + '%';
+  }, 80);
+
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    clearInterval(interval);
+    pf.style.width = '100%';
+    pl.textContent = '✓ done';
+    setTimeout(() => { pw.style.display = 'none'; pf.style.width = '0%'; }, 600);
+
+    uploadedFiles.push({ name: file.name, text: ev.target.result });
+    renderFilesList();
+    showAnalyseBlock();
+  };
+  reader.readAsText(file);
+}
+
+function renderFilesList() {
+  const list = document.getElementById('files-list');
+  list.innerHTML = '';
+  uploadedFiles.forEach(f => {
+    const div = document.createElement('div');
+    div.className = 'file-item';
+    div.innerHTML = `<div class="file-dot"></div><span class="file-name">${f.name}</span>`;
+    list.appendChild(div);
+  });
+}
+
+function showAnalyseBlock() {
+  const connector = document.getElementById('step-connector');
+  const block = document.getElementById('block-analyse');
+  const body  = document.getElementById('body-analyse');
+  const chev  = document.getElementById('chev-analyse');
+  const hdr   = document.getElementById('header-analyse');
+  const info  = document.getElementById('analyse-files-info');
+
+  connector.style.display = 'flex';
+  block.style.display = 'block';
+  body.classList.add('open');
+  chev.classList.add('open');
+  hdr.classList.add('open');
+
+  const step1 = document.getElementById('step1');
+  const step2 = document.getElementById('step2');
+  step1.classList.add('done');
+  step2.classList.add('active');
+
+  info.innerHTML = uploadedFiles.map(f =>
+    `<span class="analyse-filename">${f.name}</span>`
+  ).join('<br>');
+
+  document.getElementById('collapse-btn').style.display = 'block';
+}
+
+// ═══════════════════════════════════════════
+// TEXT ANALYSIS ENGINE
+// ═══════════════════════════════════════════
+function analyseText(text) {
+  // Tokenize
+  const raw = text;
+  const sentences = raw.split(/(?<=[.!?])\s+/);
+  const paragraphs = raw.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+
+  // Word frequency
+  const stopWords = new Set(['the','a','an','and','or','but','in','on','at','to','for',
+    'of','with','by','from','is','was','are','were','be','been','have','has','had',
+    'do','does','did','that','this','it','he','she','they','we','you','i','not',
+    'as','so','if','its','his','her','their','our','my','your','which','who','what',
+    'when','where','how','all','no','up','out','there','can','will','would','could',
+    'should','may','might','shall','just','also','than','then','more','some','into',
+    'about','over','after','before','through','between','during','each','both']);
+
+  const wordCount = {};
+  const allWords = raw.toLowerCase().match(/\b[a-z']{3,}\b/g) || [];
+  allWords.forEach(w => {
+    if (!stopWords.has(w)) wordCount[w] = (wordCount[w] || 0) + 1;
+  });
+
+  // Top words
+  const topWords = Object.entries(wordCount)
+    .sort((a,b) => b[1] - a[1])
+    .slice(0, 40)
+    .map(([word, count]) => ({ word, count }));
+
+  // Word positions in text (for bubble lines - Circle 3)
+  const wordPositions = [];
+  const trackWords = topWords.slice(0, 15).map(d => d.word);
+  const rawWords = raw.toLowerCase().split(/\s+/);
+  const totalWords = rawWords.length;
+  rawWords.forEach((w, i) => {
+    const clean = w.replace(/[^a-z']/g,'');
+    if (trackWords.includes(clean)) {
+      const paraIdx = Math.floor(i / Math.max(1, totalWords / paragraphs.length));
+      wordPositions.push({ word: clean, position: i / totalWords, paraIdx });
+    }
+  });
+
+  // Topics (cluster by keyword families)
+  const topicSeeds = [
+    { name: 'Narration', keys: ['said','told','asked','replied','answered','spoke','voice','words'] },
+    { name: 'Time', keys: ['year','years','time','day','days','moment','hour','century','ago'] },
+    { name: 'Place', keys: ['city','house','room','street','country','land','place','home'] },
+    { name: 'People', keys: ['man','woman','men','people','person','child','children','family'] },
+    { name: 'Thought', keys: ['think','thought','mind','knew','know','believe','felt','feel'] },
+    { name: 'Nature', keys: ['light','dark','sun','water','sky','earth','night','air','world'] },
+    { name: 'Action', keys: ['came','went','made','come','go','make','took','take','began'] },
+    { name: 'Emotion', keys: ['love','life','death','fear','hope','pain','heart','soul','dream'] },
+  ];
+
+  const topics = topicSeeds.map(t => {
+    const freq = t.keys.reduce((sum, k) => sum + (wordCount[k] || 0), 0);
+    const related = t.keys.filter(k => wordCount[k]).sort((a,b)=>(wordCount[b]||0)-(wordCount[a]||0));
+    return { name: t.name, freq: Math.max(freq, 1), related };
+  }).sort((a,b) => b.freq - a.freq);
+
+  // Citations detection (simple: lines starting with numbers or author-year patterns)
+  const citations = [];
+  paragraphs.forEach((p, pi) => {
+    const cite = p.match(/\(([A-Z][a-z]+(?:\s+(?:and|&)\s+[A-Z][a-z]+)?),?\s+\d{4}\)/g);
+    if (cite) {
+      cite.forEach(c => {
+        citations.push({
+          ref: c,
+          paraIdx: pi,
+          paraFraction: pi / paragraphs.length,
+          text: p.trim().slice(0, 100) + '…'
+        });
+      });
+    }
+  });
+
+  // Collocates for each top word
+  const collocateMap = {};
+  trackWords.forEach(tw => {
+    const indices = [];
+    rawWords.forEach((w, i) => { if (w.replace(/[^a-z']/g,'') === tw) indices.push(i); });
+    const neighbors = {};
+    indices.forEach(idx => {
+      for (let d = -4; d <= 4; d++) {
+        if (d === 0) continue;
+        const ni = idx + d;
+        if (ni >= 0 && ni < rawWords.length) {
+          const nw = rawWords[ni].replace(/[^a-z']/g,'');
+          if (nw.length > 2 && !stopWords.has(nw) && nw !== tw) {
+            neighbors[nw] = (neighbors[nw] || 0) + 1;
+          }
+        }
+      }
+    });
+    collocateMap[tw] = Object.entries(neighbors).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([w])=>w);
+  });
+
+  return { paragraphs, topWords, topics, wordPositions, citations, collocateMap, totalWords };
+}
+
+// ═══════════════════════════════════════════
+// RUN ANALYSIS
+// ═══════════════════════════════════════════
+function runAnalysis() {
+  if (!uploadedFiles.length) return;
+  const btn = document.getElementById('analyse-btn');
+  btn.disabled = true;
+  btn.textContent = '◌ processing…';
+
+  const indicator = document.getElementById('analysis-indicator');
+  indicator.style.display = 'flex';
+
+  const steps = ['tokenizing…','extracting topics…','building co-occurrence…','rendering circles…'];
+  let si = 0;
+  const lbl = document.getElementById('analysis-label');
+  const stepInterval = setInterval(() => {
+    lbl.textContent = steps[si++ % steps.length];
+  }, 400);
+
+  setTimeout(() => {
+    const fullText = uploadedFiles.map(f => f.text).join('\n\n');
+    corpusData = analyseText(fullText);
+
+    clearInterval(stepInterval);
+    indicator.style.display = 'none';
+    btn.disabled = false;
+    btn.textContent = '◎ re-run analysis';
+
+    document.getElementById('step2').classList.remove('active');
+    document.getElementById('step2').classList.add('done');
+    document.getElementById('legend').style.display = 'flex';
+
+    document.getElementById('empty-state').style.display = 'none';
+    renderChart(corpusData);
+    collapseAll();
+  }, 1800);
+}
+
+// ═══════════════════════════════════════════
+// ZOOM
+// ═══════════════════════════════════════════
+function zoomChange(delta) {
+  currentZoom = Math.max(0.3, Math.min(3, currentZoom + delta));
+  applyZoom();
+}
+function zoomReset() { currentZoom = 1; applyZoom(); }
+function applyZoom() {
+  document.getElementById('zoom-label').textContent = Math.round(currentZoom * 100) + '%';
+  if (chartGroup) {
+    chartGroup.attr('transform', `translate(${centerX()},${centerY()}) scale(${currentZoom})`);
+  }
+}
+function centerX() { return parseInt(document.getElementById('chart-svg').getAttribute('width')) / 2; }
+function centerY() { return parseInt(document.getElementById('chart-svg').getAttribute('height')) / 2; }
+
+// ═══════════════════════════════════════════
+// TOOLTIP
+// ═══════════════════════════════════════════
+const tooltip = document.getElementById('tooltip');
+function showTip(html, event) {
+  tooltip.style.display = 'block';
+  tooltip.innerHTML = html;
+  moveTip(event);
+}
+function moveTip(event) {
+  let x = event.clientX + 14, y = event.clientY - 10;
+  if (x + 250 > window.innerWidth) x = event.clientX - 260;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top  = y + 'px';
+}
+function hideTip() { tooltip.style.display = 'none'; }
+
+// ═══════════════════════════════════════════
+// CHART RENDER
+// ═══════════════════════════════════════════
+function renderChart(data) {
+  const stage = document.getElementById('scroll-stage');
+  const W = stage.clientWidth;
+  const H = window.innerHeight;
+  const cx = W / 2, cy = H / 2;
+
+  const svg = d3.select('#chart-svg')
+    .attr('width', W)
+    .attr('height', H);
+
+  svg.selectAll('*').remove();
+
+  // Subtle background grid
+  const defs = svg.append('defs');
+  const pat = defs.append('pattern').attr('id','grid').attr('width',460).attr('height',460).attr('patternUnits','userSpaceOnUse');
+  pat.append('circle').attr('cx',30).attr('cy',30).attr('r',2.5).attr('fill','rgba(255,255,255,0.04)');
+
+  svg.append('rect').attr('width',W).attr('height',H).attr('fill','url(#grid)');
+
+  chartGroup = svg.append('g')
+    .attr('transform', `translate(${cx},${cy}) scale(${currentZoom})`);
+
+  const R1 = 190;   // C1 force bubble zone
+  const R2_in = 230, R2_out = 270;  // C2 donut
+  const R3_in = 290, R3_out = 310;  // C3 bubble line
+  const R4_in = 330, R4_out = 360;  // C4 citations
+
+  // ── CIRCLE 2: Paragraph donut ──────────────────────
+  renderC2(chartGroup, data, R2_in, R2_out);
+
+  // ── CIRCLE 3: Word bubble line ─────────────────────
+  renderC3(chartGroup, data, R3_in, R3_out);
+
+  // ── CIRCLE 4: Citations ────────────────────────────
+  if (data.citations.length > 0) {
+    renderC4(chartGroup, data, R4_in, R4_out);
+  }
+
+  // ── CIRCLE 1: Force bubble (rendered last = on top) ─
+  renderC1(chartGroup, data, R1);
+
+  // Store for zoom
+  svgEl = svg;
+}
+
+// ──────────────────────────────────────────
+// C1 — Force Bubble (Topics)
+// ──────────────────────────────────────────
+function renderC1(g, data, radius) {
+  const maxFreq = d3.max(data.topics, d => d.freq);
+  const rScale = d3.scaleSqrt().domain([0, maxFreq]).range([8, 36]);
+
+  const colorScale = d3.scaleOrdinal()
+    .domain(data.topics.map(d=>d.name))
+    .range(['#c8a96e','#e0b87a','#d4a05a','#be9050','#a87840','#8c6030','#704820','#543010']);
+
+  const nodes = data.topics.map(d => ({
+    ...d,
+    r: rScale(d.freq),
+    x: (Math.random()-0.5) * radius,
+    y: (Math.random()-0.5) * radius,
+  }));
+
+  // Clip circle 1
+  const clipId = 'c1-clip';
+  g.append('clipPath').attr('id', clipId)
+    .append('circle').attr('r', radius);
+
+  const c1g = g.append('g').attr('clip-path', `url(#${clipId})`);
+
+  // Background circle
+  c1g.append('circle').attr('r', radius)
+    .attr('fill', 'rgba(10,10,15,0.6)')
+    .attr('stroke', 'rgba(200,169,110,0.15)')
+    .attr('stroke-width', 0.5);
+
+  const sim = d3.forceSimulation(nodes)
+    .force('center', d3.forceCenter(0, 0))
+    .force('collide', d3.forceCollide(d => d.r + 3).strength(0.85))
+    .force('charge', d3.forceManyBody().strength(-20))
+    .force('x', d3.forceX(0).strength(0.12))
+    .force('y', d3.forceY(0).strength(0.12))
+    .stop();
+
+  for (let i = 0; i < 120; i++) sim.tick();
+
+  const bubble = c1g.selectAll('.topic-bubble')
+    .data(nodes).enter().append('g')
+    .attr('class', 'topic-bubble')
+    .attr('transform', d => `translate(${d.x},${d.y})`)
+    .style('cursor','pointer');
+
+  bubble.append('circle')
+    .attr('r', d => d.r)
+    .attr('fill', d => colorScale(d.name))
+    .attr('fill-opacity', 0.82)
+    .attr('stroke', d => colorScale(d.name))
+    .attr('stroke-opacity', 0.4)
+    .attr('stroke-width', 1);
+
+  bubble.append('text')
+    .text(d => d.r > 16 ? d.name : '')
+    .attr('text-anchor','middle').attr('dominant-baseline','central')
+    .style('font-family','DM Mono,monospace').style('font-size', d => Math.min(d.r * 0.38, 11) + 'px')
+    .style('fill','rgba(255,255,255,0.85)').style('pointer-events','none');
+
+  bubble.append('text')
+    .text(d => d.r > 22 ? d.freq : '')
+    .attr('text-anchor','middle').attr('y', d => d.r * 0.38)
+    .style('font-family','DM Mono,monospace').style('font-size','9px')
+    .style('fill','rgba(255,255,255,0.45)').style('pointer-events','none');
+
+  bubble
+    .on('mousemove', (event, d) => {
+      const related = d.related.length ? d.related.join(', ') : '—';
+      showTip(`
+        <div class="tt-label">topic</div>
+        <div class="tt-value">${d.name}</div>
+        <div class="tt-sub">freq: ${d.freq}</div>
+        <div class="tt-sub">words: ${related}</div>
+      `, event);
+    })
+    .on('mouseleave', hideTip);
+}
+
+// ──────────────────────────────────────────
+// C2 — Paragraph Donut
+// ──────────────────────────────────────────
+function renderC2(g, data, rIn, rOut) {
+  const paras = data.paragraphs;
+  const total = paras.reduce((s, p) => s + p.length, 0);
+
+  // Build segments: para + space, with bigger gap for short (empty) paragraphs
+  const segments = [];
+  paras.forEach((p, i) => {
+    const isTitle = i === 0;
+    const isSection = p.trim().length < 60 && p.trim().length > 0;
+    segments.push({
+      type: 'para', idx: i, text: p,
+      weight: Math.max(p.length / total, 0.005),
+      isTitle, isSection
+    });
+    // Space segment
+    const spaceWeight = (isSection || isTitle) ? 0.025 : 0.008;
+    segments.push({ type: 'space', idx: i, weight: spaceWeight });
+  });
+
+  const totalW = segments.reduce((s,d) => s + d.weight, 0);
+  let angle = -Math.PI / 2;
+  segments.forEach(d => { d.startAngle = angle; d.endAngle = angle + (d.weight / totalW) * 2 * Math.PI; angle = d.endAngle; });
+
+  const arc = d3.arc().innerRadius(rIn).outerRadius(rOut).cornerRadius(1);
+  const arcHover = d3.arc().innerRadius(rIn - 3).outerRadius(rOut + 4).cornerRadius(2);
+
+  const c2g = g.append('g');
+
+  c2g.selectAll('.para-seg')
+    .data(segments).enter().append('path')
+    .attr('class','para-seg')
+    .attr('d', d => arc({ startAngle: d.startAngle, endAngle: d.endAngle }))
+    .attr('fill', d => {
+      if (d.type === 'space') return 'transparent';
+      if (d.isTitle) return 'rgba(200,169,110,0.55)';
+      if (d.isSection) return 'rgba(200,169,110,0.35)';
+      return 'rgba(126,184,201,0.22)';
+    })
+    .attr('stroke', d => {
+      if (d.type === 'space') return 'none';
+      if (d.isTitle) return 'rgba(200,169,110,0.7)';
+      return 'rgba(126,184,201,0.35)';
+    })
+    .attr('stroke-width', 0.5)
+    .style('cursor', d => d.type === 'para' ? 'pointer' : 'default')
+    .on('mousemove', (event, d) => {
+      if (d.type !== 'para') return;
+      const preview = d.text.trim().split(/\s+/).slice(0,10).join(' ') + '…';
+      const tag = d.isTitle ? 'title' : d.isSection ? 'section' : `paragraph ${d.idx}`;
+      showTip(`<div class="tt-label">${tag}</div><div class="tt-value" style="font-size:10px;line-height:1.5">${preview}</div>`, event);
+    })
+    .on('mouseleave', hideTip)
+    .on('mouseover', function(event, d) {
+      if (d.type !== 'para') return;
+      d3.select(this).attr('d', arcHover({ startAngle: d.startAngle, endAngle: d.endAngle }));
+    })
+    .on('mouseout', function(event, d) {
+      d3.select(this).attr('d', arc({ startAngle: d.startAngle, endAngle: d.endAngle }));
+    });
+
+  // Ring border lines
+  c2g.append('circle').attr('r', rIn).attr('fill','none').attr('stroke','rgba(126,184,201,0.1)').attr('stroke-width',0.5);
+  c2g.append('circle').attr('r', rOut).attr('fill','none').attr('stroke','rgba(126,184,201,0.15)').attr('stroke-width',0.5);
+}
+
+// ──────────────────────────────────────────
+// C3 — Bubble Line (Word occurrences)
+// ──────────────────────────────────────────
+function renderC3(g, data, rIn, rOut) {
+  const rMid = (rIn + rOut) / 2;
+  const r = (rOut - rIn) / 2 - 1;
+
+  const colorScale = d3.scaleOrdinal()
+    .domain(data.wordPositions.map(d => d.word))
+    .range(d3.schemeTableau10);
+
+  const c3g = g.append('g');
+
+  // Track ring
+  c3g.append('circle').attr('r', rMid).attr('fill','none')
+    .attr('stroke','rgba(155,127,199,0.12)').attr('stroke-width', rOut - rIn)
+    .attr('stroke-dasharray','none');
+
+  c3g.append('circle').attr('r', rIn).attr('fill','none').attr('stroke','rgba(155,127,199,0.15)').attr('stroke-width',0.5);
+  c3g.append('circle').attr('r', rOut).attr('fill','none').attr('stroke','rgba(155,127,199,0.2)').attr('stroke-width',0.5);
+
+  // Bubbles
+  c3g.selectAll('.word-dot')
+    .data(data.wordPositions).enter().append('circle')
+    .attr('class','word-dot')
+    .attr('cx', d => rMid * Math.cos(d.position * 2 * Math.PI - Math.PI / 2))
+    .attr('cy', d => rMid * Math.sin(d.position * 2 * Math.PI - Math.PI / 2))
+    .attr('r', 3.5)
+    .attr('fill', d => colorScale(d.word))
+    .attr('fill-opacity', 0.85)
+    .attr('stroke', d => colorScale(d.word))
+    .attr('stroke-opacity', 0.4)
+    .attr('stroke-width', 1)
+    .style('cursor','pointer')
+    .on('mousemove', (event, d) => {
+      const collocates = (data.collocateMap[d.word] || []).join(', ') || '—';
+      showTip(`
+        <div class="tt-label">word occurrence</div>
+        <div class="tt-value">${d.word}</div>
+        <div class="tt-sub">paragraph: ${d.paraIdx + 1}</div>
+        <div class="tt-sub">collocates: ${collocates}</div>
+      `, event);
+    })
+    .on('mouseleave', hideTip);
+}
+
+// ──────────────────────────────────────────
+// C4 — Citations
+// ──────────────────────────────────────────
+function renderC4(g, data, rIn, rOut) {
+  const rMid = (rIn + rOut) / 2;
+
+  const c4g = g.append('g');
+
+  c4g.append('circle').attr('r', rMid).attr('fill','none')
+    .attr('stroke','rgba(201,126,126,0.08)').attr('stroke-width', rOut - rIn);
+  c4g.append('circle').attr('r', rIn).attr('fill','none').attr('stroke','rgba(201,126,126,0.15)').attr('stroke-width',0.5);
+  c4g.append('circle').attr('r', rOut).attr('fill','none').attr('stroke','rgba(201,126,126,0.2)').attr('stroke-width',0.5);
+
+  c4g.selectAll('.cite-dot')
+    .data(data.citations).enter().append('g')
+    .attr('class','cite-dot')
+    .attr('transform', d => {
+      const angle = d.paraFraction * 2 * Math.PI - Math.PI / 2;
+      const x = rMid * Math.cos(angle);
+      const y = rMid * Math.sin(angle);
+      return `translate(${x},${y})`;
+    })
+    .each(function(d) {
+      const grp = d3.select(this);
+      grp.append('circle').attr('r', 5)
+        .attr('fill','rgba(201,126,126,0.7)')
+        .attr('stroke','rgba(201,126,126,0.9)').attr('stroke-width', 1.5);
+
+      // Author name label
+      const authorMatch = d.ref.match(/\(([A-Z][a-z]+)/);
+      if (authorMatch) {
+        const angle = d.paraFraction * 2 * Math.PI - Math.PI / 2;
+        const lx = Math.cos(angle) * 16, ly = Math.sin(angle) * 16;
+        grp.append('text')
+          .text(authorMatch[1])
+          .attr('x', lx).attr('y', ly)
+          .attr('text-anchor', Math.cos(angle) > 0 ? 'start' : 'end')
+          .attr('dominant-baseline','central')
+          .style('font-family','DM Mono,monospace').style('font-size','8px')
+          .style('fill','rgba(201,126,126,0.9)').style('pointer-events','none');
+      }
+    })
+    .style('cursor','pointer')
+    .on('mousemove', (event, d) => {
+      showTip(`
+        <div class="tt-label">citation</div>
+        <div class="tt-value">${d.ref}</div>
+        <div class="tt-sub">paragraph: ${d.paraIdx + 1}</div>
+        <div class="tt-sub" style="margin-top:5px">${d.text}</div>
+      `, event);
+    })
+    .on('mouseleave', hideTip);
+}
+
+// ═══════════════════════════════════════════
+// RESIZE
+// ═══════════════════════════════════════════
+window.addEventListener('resize', () => {
+  if (corpusData) renderChart(corpusData);
+});
+
+// ═══════════════════════════════════════════
+// DEMO DATA — load on page open
+// ═══════════════════════════════════════════
+const demoText = `The Architecture of Memory
+
+In the late nineteenth century, scholars began to question the nature of consciousness and its relationship to language. The mind, they argued, was not a passive receiver of experience but an active constructor of meaning.
+
+When we consider how memories are formed, we must first acknowledge the role of attention. Without directed focus, experience passes through us like water through open hands (James, 1890). The stream of consciousness that William James famously described was not a metaphor but a phenomenological observation.
+
+Language shapes memory in profound ways. The words we have available to describe an experience determine, in part, how that experience is encoded and later retrieved. This linguistic relativity extends beyond simple vocabulary into the deep structures of grammar (Whorf, 1956).
+
+The relationship between narrative and memory has occupied philosophers and psychologists alike. We do not simply remember events; we reconstruct them, each time adding new layers of interpretation. The remembered past is always, in some sense, a work of fiction.
+
+Episodic memory, as defined by Tulving, stands in contrast to semantic memory. Where the latter stores general knowledge about the world, the former preserves the when and where of personal experience. This distinction has proven enormously fruitful in neuropsychological research (Tulving, 1972).
+
+The hippocampus plays a central role in the consolidation of new memories. Damage to this structure, as famously documented in the case of patient H.M., results in an inability to form new long-term memories while leaving older memories largely intact.
+
+Forgetting, far from being a failure of the system, serves important adaptive functions. The selective retention of significant experiences over trivial ones allows the mind to operate efficiently in a complex world.
+
+Trauma disrupts normal memory processes in distinctive ways. Intrusive memories, flashbacks, and dissociation represent failures of normal integration. The body, Bessel van der Kolk has argued, keeps the score (van der Kolk, 2014).
+
+Social memory extends beyond the individual. Communities construct shared narratives that bind members together and define collective identity. These narratives are transmitted across generations through ritual, story, and material culture.
+
+The future of memory research lies at the intersection of neuroscience, psychology, and philosophy. New imaging technologies allow us to observe the brain in the act of remembering, bringing us closer to understanding one of the most fundamental aspects of human existence.`;
+
+window.addEventListener('DOMContentLoaded', () => {
+  // Pre-load demo so users can see the chart immediately
+  setTimeout(() => {
+    uploadedFiles = [{ name: 'demo_memory.txt', text: demoText }];
+    renderFilesList();
+    showAnalyseBlock();
+  }, 300);
+});
+</script>
+</body>
+</html>
