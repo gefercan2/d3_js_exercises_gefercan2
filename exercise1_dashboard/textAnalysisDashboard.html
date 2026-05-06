@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lexis — Text Analysis Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=Syne:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+
+<style>
+/* ═══════════════════════════════════════════════════════════
+   CUSTOMISATION PALETTE
+   ═══════════════════════════════════════════════════════════ */
+:root {
+  --font-ui:      'IBM Plex Mono', monospace;
+  --font-display: 'Syne', sans-serif;
+
+  --bg:            #0d0f14;
+  --bg-panel:      #13161e;
+  --bg-panel-alt:  #191d28;
+  --bg-elevated:   #1e2230;
+  --border:        rgba(255,255,255,0.07);
+  --border-active: rgba(120,180,255,0.35);
+
+  --text-primary:  #e8ecf4;
+  --text-secondary:#7a8499;
+  --text-muted:    #424a5e;
+  --text-accent:   #78b4ff;
+
+  --accent:        #4f8eff;
+  --accent-glow:   rgba(79,142,255,0.18);
+  --accent-soft:   rgba(79,142,255,0.10);
+  --success:       #3ecf8e;
+  --success-soft:  rgba(62,207,142,0.12);
+  --warn:          #f59e0b;
+
+  --c-cirrus:   #a78bfa;
+  --c-trends:   #34d399;
+  --c-bubbles:  #fb923c;
+  --c-topics:   #f472b6;
+  --c-mandala:  #38bdf8;
+  --c-corpus:   #94a3b8;
+  --c-kwic:     #a3e635;
+  --c-patterns: #fbbf24;
+
+  --gap-xs: 4px; --gap-sm: 8px; --gap-md: 16px; --gap-lg: 24px; --gap-xl: 36px;
+  --r-sm: 4px; --r-md: 8px; --r-lg: 14px;
+
+  --sidemenu-width:     52px;
+  --sidemenu-bg:        #0d0f14;
+  --sidemenu-icon-size: 18px;
+  --bottombar-height:   220px;
+  --upload-panel-width: 300px;
+  --upload-panel-top:   16px;
+  --upload-panel-left:  68px;
+  --progress-color:     var(--accent);
+  --step-dot-size:      10px;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur:  0.28s;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width:100%; height:100%; background:var(--bg); color:var(--text-primary); font-family:var(--font-ui); font-size:13px; overflow:hidden; }
+
+/* ── Scene ── */
+#scene { position:relative; width:100vw; height:100vh; overflow:hidden; display:flex; flex-direction:column; }
+#scene::after { content:''; position:absolute; inset:0; background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.04) 2px,rgba(0,0,0,0.04) 4px); pointer-events:none; z-index:999; }
+
+/* ── Scroll canvas ── */
+#canvas-scroll { flex:1 1 auto; overflow-x:auto; overflow-y:hidden; scrollbar-width:thin; scrollbar-color:var(--bg-elevated) transparent; padding-bottom:var(--bottombar-height); }
+#canvas-scroll::-webkit-scrollbar { height:6px; }
+#canvas-scroll::-webkit-scrollbar-thumb { background:var(--bg-elevated); border-radius:3px; }
+#canvas-inner { display:flex; flex-direction:row; width:200vw; height:100%; padding:var(--gap-md) var(--gap-md) var(--gap-md) calc(var(--sidemenu-width) + var(--gap-md)); gap:var(--gap-md); }
+
+/* ── Generic panel ── */
+.panel { flex:0 0 auto; background:var(--bg-panel); border:0.5px solid var(--border); border-radius:var(--r-lg); display:flex; flex-direction:column; overflow:hidden; transition:border-color var(--dur) var(--ease); position:relative; }
+.panel:hover { border-color:var(--border-active); }
+.panel-header { display:flex; align-items:center; gap:var(--gap-sm); padding:10px var(--gap-md); border-bottom:0.5px solid var(--border); background:var(--bg-panel-alt); flex-shrink:0; }
+.panel-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.panel-label { font-family:var(--font-display); font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-secondary); }
+.panel-body { flex:1 1 auto; display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:12px; padding:var(--gap-md); position:relative; overflow:hidden; }
+.panel-body::before { content:''; position:absolute; inset:0; background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px); background-size:32px 32px; opacity:0.4; pointer-events:none; }
+.empty-label { position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; gap:var(--gap-sm); opacity:0.4; }
+.empty-icon { font-size:28px; }
+
+/* ── Panel sizes ── */
+#p-cirrus  { width:38vw; } #p-cirrus  .panel-dot { background:var(--c-cirrus); }
+#p-trends  { width:44vw; } #p-trends  .panel-dot { background:var(--c-trends); }
+#p-bubbles { width:34vw; } #p-bubbles .panel-dot { background:var(--c-bubbles); }
+#p-topics  { width:44vw; } #p-topics  .panel-dot { background:var(--c-topics); }
+#p-mandala { width:40vw; } #p-mandala .panel-dot { background:var(--c-mandala); }
+
+/* ── Bottom bar ── */
+#bottom-bar { position:absolute; bottom:0; left:0; width:100%; height:var(--bottombar-height); display:flex; flex-direction:row; gap:var(--gap-md); padding:0 var(--gap-md) var(--gap-md) calc(var(--sidemenu-width) + var(--gap-md)); background:linear-gradient(to top,var(--bg) 60%,transparent); z-index:20; }
+#bottom-bar .panel { flex:1 1 0; min-width:0; }
+#p-corpus  .panel-dot { background:var(--c-corpus); }
+#p-kwic    .panel-dot { background:var(--c-kwic); }
+#p-patterns .panel-dot { background:var(--c-patterns); }
+
+/* ── KWIC ── */
+#p-kwic .panel-body { overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--bg-elevated) transparent; align-items:flex-start; justify-content:flex-start; padding:8px; }
+.kwic-table { position:relative; z-index:1; width:100%; border-collapse:collapse; font-size:11px; }
+.kwic-table td { padding:3px 6px; white-space:nowrap; color:var(--text-secondary); }
+.kwic-table tr:hover td { background:var(--bg-elevated); }
+.kwic-kw { color:var(--text-accent); font-weight:500; }
+.kwic-left { text-align:right; }
+.kwic-right { text-align:left; }
+
+/* ── Corpus stats ── */
+.corpus-grid { position:relative; z-index:1; display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; width:100%; }
+.stat-item { display:flex; flex-direction:column; gap:2px; }
+.stat-label { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; }
+.stat-value { font-family:var(--font-display); font-size:16px; color:var(--text-primary); }
+
+/* ── Patterns panel ── */
+#p-patterns .panel-body { flex-direction:column; align-items:flex-start; overflow-y:auto; scrollbar-width:thin; padding:8px; }
+.pattern-input-row { display:flex; gap:6px; width:100%; position:relative; z-index:1; margin-bottom:8px; flex-shrink:0; }
+.pattern-input { flex:1; background:var(--bg-elevated); border:0.5px solid var(--border); border-radius:var(--r-sm); color:var(--text-primary); font-family:var(--font-ui); font-size:11px; padding:5px 8px; }
+.pattern-input:focus { outline:none; border-color:var(--border-active); }
+.pattern-btn { background:var(--accent-soft); border:1px solid var(--border-active); border-radius:var(--r-sm); color:var(--accent); font-family:var(--font-ui); font-size:11px; padding:5px 10px; cursor:pointer; }
+.pattern-btn:hover { background:var(--accent); color:#fff; }
+.pattern-results { position:relative; z-index:1; width:100%; display:flex; flex-direction:column; gap:3px; overflow-y:auto; }
+.pattern-hit { font-size:11px; padding:3px 6px; border-radius:var(--r-sm); color:var(--text-secondary); border:0.5px solid var(--border); }
+.pattern-hit mark { background:rgba(251,191,36,0.25); color:var(--c-patterns); border-radius:2px; padding:0 2px; }
+
+/* ── Side menu ── */
+#sidemenu { position:absolute; top:0; left:0; width:var(--sidemenu-width); height:100%; background:var(--sidemenu-bg); border-right:0.5px solid var(--border); display:flex; flex-direction:column; align-items:center; padding-top:var(--gap-md); gap:var(--gap-sm); z-index:40; }
+.sm-logo { font-family:var(--font-display); font-size:15px; font-weight:700; color:var(--accent); letter-spacing:-0.02em; writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg); margin-bottom:var(--gap-md); cursor:default; user-select:none; }
+.sm-btn { width:36px; height:36px; border-radius:var(--r-md); background:transparent; border:0.5px solid transparent; color:var(--text-muted); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:var(--sidemenu-icon-size); transition:all var(--dur) var(--ease); position:relative; }
+.sm-btn:hover { background:var(--bg-elevated); border-color:var(--border); color:var(--text-primary); }
+.sm-btn.active { background:var(--accent-soft); border-color:var(--border-active); color:var(--accent); }
+.sm-btn svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+.sm-btn::after { content:attr(data-tip); position:absolute; left:calc(100% + 10px); top:50%; transform:translateY(-50%); background:var(--bg-elevated); border:0.5px solid var(--border); padding:4px 8px; border-radius:var(--r-sm); font-family:var(--font-ui); font-size:11px; color:var(--text-primary); white-space:nowrap; pointer-events:none; opacity:0; transition:opacity 0.15s; z-index:100; }
+.sm-btn:hover::after { opacity:1; }
+.sm-divider { width:28px; height:0.5px; background:var(--border); margin:var(--gap-xs) 0; }
+
+/* ── Upload panel ── */
+#upload-panel { position:absolute; top:var(--upload-panel-top); left:var(--upload-panel-left); width:var(--upload-panel-width); z-index:50; display:flex; flex-direction:column; gap:0; }
+.step-connector { display:flex; flex-direction:column; align-items:center; }
+.step-node { width:var(--step-dot-size); height:var(--step-dot-size); border-radius:50%; background:var(--border); border:2px solid var(--bg-elevated); transition:background var(--dur) var(--ease); flex-shrink:0; z-index:2; }
+.step-node.done  { background:var(--success); }
+.step-node.active { background:var(--accent); box-shadow:0 0 0 3px var(--accent-glow); }
+.step-line { width:2px; height:16px; background:var(--border); transition:background var(--dur) var(--ease); flex-shrink:0; }
+.step-line.done { background:var(--success); }
+
+.up-card { background:var(--bg-panel); border:0.5px solid var(--border); border-radius:var(--r-lg); overflow:hidden; transition:border-color var(--dur) var(--ease); }
+.up-card:hover { border-color:var(--border-active); }
+.up-card-header { display:flex; align-items:center; justify-content:space-between; padding:10px var(--gap-md); background:var(--bg-panel-alt); border-bottom:0.5px solid var(--border); cursor:pointer; user-select:none; }
+.up-card-title { font-family:var(--font-display); font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-secondary); display:flex; align-items:center; gap:var(--gap-sm); }
+.up-card-step { width:18px; height:18px; border-radius:50%; background:var(--accent-soft); border:1px solid var(--accent); color:var(--accent); font-size:10px; display:flex; align-items:center; justify-content:center; font-weight:500; }
+.up-card-chevron { color:var(--text-muted); font-size:10px; transition:transform var(--dur) var(--ease); }
+.up-card-chevron.collapsed { transform:rotate(-90deg); }
+.up-card-body { padding:var(--gap-md); display:flex; flex-direction:column; gap:var(--gap-md); }
+.up-card-body.collapsed { display:none; }
+
+.drop-zone { border:1.5px dashed var(--border-active); border-radius:var(--r-md); padding:var(--gap-lg) var(--gap-md); display:flex; flex-direction:column; align-items:center; gap:var(--gap-sm); cursor:pointer; transition:background var(--dur) var(--ease); text-align:center; }
+.drop-zone:hover, .drop-zone.dragover { background:var(--accent-soft); border-color:var(--accent); }
+.drop-icon { font-size:24px; opacity:0.5; }
+.drop-label { color:var(--text-secondary); font-size:12px; }
+.drop-sub   { color:var(--text-muted); font-size:11px; }
+.drop-btn { background:var(--accent-soft); border:1px solid var(--border-active); border-radius:var(--r-sm); color:var(--accent); font-family:var(--font-ui); font-size:11px; padding:5px 14px; cursor:pointer; }
+.drop-btn:hover { background:var(--accent); color:#fff; }
+#file-input { display:none; }
+
+.progress-wrap { display:none; flex-direction:column; gap:var(--gap-xs); }
+.progress-wrap.visible { display:flex; }
+.progress-filename { color:var(--text-secondary); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.progress-track { height:4px; border-radius:2px; background:var(--bg-elevated); overflow:hidden; }
+.progress-fill { height:100%; border-radius:2px; background:var(--accent); width:0%; transition:width 0.1s linear; }
+.progress-fill.done { background:var(--success); }
+.progress-pct { color:var(--text-muted); font-size:10px; text-align:right; }
+
+.file-item { display:flex; align-items:center; gap:var(--gap-sm); padding:7px 10px; border-radius:var(--r-sm); border:0.5px solid var(--border); background:var(--bg-elevated); }
+.file-thumb { width:24px; height:24px; border-radius:var(--r-sm); background:var(--accent-soft); border:1px solid var(--border-active); display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--accent); flex-shrink:0; }
+.file-name { flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:var(--text-primary); }
+.file-size { color:var(--text-muted); font-size:10px; flex-shrink:0; }
+.file-remove { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:14px; padding:0 2px; transition:color var(--dur) var(--ease); flex-shrink:0; }
+.file-remove:hover { color:#f87171; }
+
+.btn-analyse { width:100%; padding:9px; border-radius:var(--r-md); background:var(--accent); border:none; color:#fff; font-family:var(--font-display); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:var(--gap-sm); }
+.btn-analyse:hover { opacity:0.85; }
+.btn-analyse:disabled { opacity:0.4; cursor:not-allowed; }
+
+.analyse-progress-wrap { display:none; flex-direction:column; gap:var(--gap-sm); }
+.analyse-progress-wrap.visible { display:flex; }
+.analyse-step-row { display:flex; align-items:center; gap:var(--gap-sm); font-size:11px; color:var(--text-muted); transition:color var(--dur) var(--ease); }
+.analyse-step-row.active { color:var(--text-accent); }
+.analyse-step-row.done   { color:var(--success); }
+.analyse-step-icon { font-size:12px; width:14px; text-align:center; }
+
+/* ── Word selector pill ── */
+.word-pill { display:inline-flex; align-items:center; gap:4px; background:var(--accent-soft); border:1px solid var(--border-active); border-radius:20px; padding:2px 10px; font-size:11px; color:var(--accent); cursor:pointer; margin:2px; }
+.word-pill.selected { background:var(--accent); color:#fff; }
+.word-pill:hover { background:var(--accent); color:#fff; }
+
+/* selected word global indicator */
+#selected-word-bar { position:absolute; top:0; left:var(--sidemenu-width); right:0; height:28px; background:linear-gradient(to bottom,rgba(79,142,255,0.1),transparent); display:none; align-items:center; padding-left:12px; gap:8px; z-index:30; font-size:11px; color:var(--text-accent); pointer-events:none; }
+#selected-word-bar.visible { display:flex; }
+</style>
+</head>
+<body>
+<div id="scene">
+
+<!-- selected word indicator bar -->
+<div id="selected-word-bar">
+  <span style="opacity:0.6">pivot:</span>
+  <span id="sw-label" style="font-family:var(--font-display);font-weight:500"></span>
+  <span style="opacity:0.4;font-size:10px">— click any word to update all panels</span>
+</div>
+
+<!-- ═══════ SIDE MENU ═══════ -->
+<nav id="sidemenu">
+  <div class="sm-logo">LEXIS</div>
+  <button class="sm-btn active" data-tip="Upload corpus" onclick="toggleUploadPanel()">
+    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+  </button>
+  <div class="sm-divider"></div>
+  <button class="sm-btn" data-tip="Cirrus cloud" onclick="scrollToPanel('p-cirrus')">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="6" cy="8" r="2"/><circle cx="18" cy="8" r="2.5"/><circle cx="5" cy="15" r="1.5"/><circle cx="19" cy="15" r="2"/><circle cx="12" cy="19" r="1.5"/></svg>
+  </button>
+  <button class="sm-btn" data-tip="Trends" onclick="scrollToPanel('p-trends')">
+    <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+  </button>
+  <button class="sm-btn" data-tip="Bubble lines" onclick="scrollToPanel('p-bubbles')">
+    <svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><circle cx="7" cy="12" r="2"/><circle cx="12" cy="12" r="3"/><circle cx="17" cy="12" r="1.5"/></svg>
+  </button>
+  <button class="sm-btn" data-tip="Topic heatmap" onclick="scrollToPanel('p-topics')">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="4" height="4" rx="1"/><rect x="10" y="3" width="4" height="4" rx="1"/><rect x="17" y="3" width="4" height="4" rx="1"/><rect x="3" y="10" width="4" height="4" rx="1"/><rect x="10" y="10" width="4" height="4" rx="1"/><rect x="17" y="10" width="4" height="4" rx="1"/><rect x="3" y="17" width="4" height="4" rx="1"/><rect x="10" y="17" width="4" height="4" rx="1"/><rect x="17" y="17" width="4" height="4" rx="1"/></svg>
+  </button>
+  <button class="sm-btn" data-tip="Mandala" onclick="scrollToPanel('p-mandala')">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><line x1="12" y1="11" x2="12" y2="4"/><line x1="12" y1="13" x2="12" y2="20"/><line x1="11" y1="12" x2="4" y2="12"/><line x1="13" y1="12" x2="20" y2="12"/><line x1="10.6" y1="10.6" x2="5.6" y2="5.6"/><line x1="13.4" y1="13.4" x2="18.4" y2="18.4"/><line x1="13.4" y1="10.6" x2="18.4" y2="5.6"/><line x1="10.6" y1="13.4" x2="5.6" y2="18.4"/></svg>
+  </button>
+  <div class="sm-divider" style="margin-top:auto"></div>
+  <button class="sm-btn" data-tip="Export CSV" onclick="exportCSV()" style="margin-bottom:var(--gap-md)">
+    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+  </button>
+</nav>
+
+<!-- ═══════ MAIN CANVAS ═══════ -->
+<div id="canvas-scroll">
+  <div id="canvas-inner">
+
+    <!-- 1. Cirrus cloud -->
+    <div class="panel" id="p-cirrus">
+      <div class="panel-header">
+        <div class="panel-dot"></div>
+        <span class="panel-label">Cirrus — Word Cloud</span>
+        <span style="margin-left:auto;font-size:10px;color:var(--text-muted)" id="cirrus-count"></span>
+      </div>
+      <div class="panel-body" id="cirrus-body">
+        <div class="empty-label"><span class="empty-icon">☁</span><span>Load a corpus to begin</span></div>
+      </div>
+    </div>
+
+    <!-- 2. Trends streamgraph -->
+    <div class="panel" id="p-trends">
+      <div class="panel-header">
+        <div class="panel-dot"></div>
+        <span class="panel-label">Trends — Relative Frequency</span>
+        <span style="margin-left:auto;font-size:10px;color:var(--text-muted)" id="trends-info"></span>
+      </div>
+      <div class="panel-body" id="trends-body" style="flex-direction:column;padding:8px;">
+        <div class="empty-label"><span class="empty-icon">〜</span><span>Load a corpus to begin</span></div>
+      </div>
+    </div>
+
+    <!-- 3. Bubble lines -->
+    <div class="panel" id="p-bubbles">
+      <div class="panel-header">
+        <div class="panel-dot"></div>
+        <span class="panel-label">Bubblelines — Distribution</span>
+      </div>
+      <div class="panel-body" id="bubbles-body" style="flex-direction:column;overflow-y:auto;align-items:flex-start;padding:8px;">
+        <div class="empty-label"><span class="empty-icon">◉</span><span>Load a corpus to begin</span></div>
+      </div>
+    </div>
+
+    <!-- 4. Topic heatmap -->
+    <div class="panel" id="p-topics">
+      <div class="panel-header">
+        <div class="panel-dot"></div>
+        <span class="panel-label">Topics — LDA Heatmap</span>
+        <span style="margin-left:auto;font-size:10px;color:var(--text-muted)" id="topics-k"></span>
+      </div>
+      <div class="panel-body" id="topics-body" style="flex-direction:column;overflow:auto;align-items:flex-start;padding:8px;">
+        <div class="empty-label"><span class="empty-icon">▦</span><span>Load a corpus to begin</span></div>
+      </div>
+    </div>
+
+    <!-- 5. Mandala / word tree -->
+    <div class="panel" id="p-mandala">
+      <div class="panel-header">
+        <div class="panel-dot"></div>
+        <span class="panel-label">Mandala — Word Context Tree</span>
+        <span style="margin-left:auto;font-size:10px;color:var(--text-muted)" id="mandala-word"></span>
+      </div>
+      <div class="panel-body" id="mandala-body">
+        <div class="empty-label"><span class="empty-icon">✳</span><span>Click any word to explore</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════ BOTTOM BAR ═══════ -->
+<div id="bottom-bar">
+
+  <div class="panel" id="p-corpus">
+    <div class="panel-header"><div class="panel-dot"></div><span class="panel-label">Corpus Summary</span></div>
+    <div class="panel-body" id="corpus-body">
+      <div class="corpus-grid">
+        <div class="stat-item"><div class="stat-label">Documents</div><div class="stat-value" id="stat-docs">—</div></div>
+        <div class="stat-item"><div class="stat-label">Tokens</div><div class="stat-value" id="stat-tokens">—</div></div>
+        <div class="stat-item"><div class="stat-label">Types</div><div class="stat-value" id="stat-types">—</div></div>
+        <div class="stat-item"><div class="stat-label">TTR</div><div class="stat-value" id="stat-ttr">—</div></div>
+        <div class="stat-item" style="grid-column:1/-1"><div class="stat-label">Avg sentence length</div><div class="stat-value" id="stat-avgsen">—</div></div>
+        <div class="stat-item" style="grid-column:1/-1"><div class="stat-label">Avg word length</div><div class="stat-value" id="stat-avgword">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="p-kwic">
+    <div class="panel-header">
+      <div class="panel-dot"></div>
+      <span class="panel-label">Contexts — KWIC</span>
+      <span style="margin-left:auto;font-size:10px;color:var(--text-muted)" id="kwic-word-label"></span>
+    </div>
+    <div class="panel-body" id="kwic-body">
+      <div class="empty-label"><span class="empty-icon">≡</span><span>Click a word to see contexts</span></div>
+    </div>
+  </div>
+
+  <div class="panel" id="p-patterns">
+    <div class="panel-header"><div class="panel-dot"></div><span class="panel-label">Sentence Patterns</span></div>
+    <div class="panel-body" id="patterns-body" style="flex-direction:column;align-items:flex-start;overflow-y:auto;padding:8px;">
+      <div class="pattern-input-row">
+        <input class="pattern-input" id="pattern-input" placeholder="regex pattern…" value="the\s+\w+">
+        <button class="pattern-btn" onclick="runPattern()">Search</button>
+      </div>
+      <div class="pattern-results" id="pattern-results">
+        <div style="color:var(--text-muted);font-size:11px;position:relative;z-index:1">Load a corpus, then search</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════ UPLOAD PANEL ═══════ -->
+<div id="upload-panel">
+  <div class="up-card" id="card-upload">
+    <div class="up-card-header" onclick="toggleCard('card-upload')">
+      <div class="up-card-title"><div class="up-card-step" id="step1-badge">1</div>Load corpus</div>
+      <span class="up-card-chevron" id="chevron1">▾</span>
+    </div>
+    <div class="up-card-body" id="body-upload">
+      <div class="drop-zone" id="drop-zone"
+           ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)"
+           onclick="document.getElementById('file-input').click()">
+        <span class="drop-icon">📄</span>
+        <span class="drop-label">Drop .txt / .csv / .json files</span>
+        <span class="drop-sub">or paste text below</span>
+        <button class="drop-btn">Browse files</button>
+      </div>
+      <input type="file" id="file-input" multiple accept=".txt,.csv,.json" onchange="handleFileInput(event)">
+      <textarea id="paste-area" placeholder="…or paste text here" style="width:100%;height:60px;background:var(--bg-elevated);border:0.5px solid var(--border);border-radius:var(--r-sm);color:var(--text-primary);font-family:var(--font-ui);font-size:11px;padding:6px 8px;resize:none;" oninput="handlePaste(this)"></textarea>
+      <div class="progress-wrap" id="progress-wrap">
+        <div class="progress-filename" id="progress-filename"></div>
+        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="progress-pct" id="progress-pct">0%</div>
+      </div>
+    </div>
+  </div>
+  <div class="step-connector" id="step-connector">
+    <div class="step-node" id="snode1"></div>
+    <div class="step-line" id="sline1"></div>
+    <div class="step-node" id="snode2"></div>
+  </div>
+  <div class="up-card" id="card-files">
+    <div class="up-card-header" onclick="toggleCard('card-files')">
+      <div class="up-card-title"><div class="up-card-step" id="step2-badge">2</div>Analyse</div>
+      <span class="up-card-chevron collapsed" id="chevron2">▾</span>
+    </div>
+    <div class="up-card-body collapsed" id="body-files">
+      <div id="file-list"></div>
+      <button class="btn-analyse" id="btn-analyse" onclick="startAnalysis()" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Run analysis
+      </button>
+      <div class="analyse-progress-wrap" id="analyse-progress">
+        <div class="analyse-steps" id="analyse-steps"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /scene -->
+
+<!-- ════════════════════════════════════════════════════════════════
+     ENGINE + VISUALISATIONS
+     ════════════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════════════
+   0. GLOBAL STATE
+   ══════════════════════════════════════════════════════ */
+const STATE = {
+  corpus: [],          // [{name, text, tokens, sentences}]
+  freq: new Map(),     // term → count
+  freqRel: new Map(),  // term → relative freq
+  bigrams: new Map(),  // "a b" → count
+  collocates: new Map(),// term → Map(context→count)
+  sentences: [],       // all sentences (strings)
+  segments: [],        // [{tokens}] for trends
+  topics: [],          // [{terms, weights}]
+  selectedWord: null,
+  uploadedFiles: [],
+  uploadPanelVisible: true,
+  ready: false,
+};
+
+const STOPWORDS = new Set('a an the and or but if in on at to of for with by is was are were be been has have had do does did will would could should may might shall can not no nor so yet both either neither each few more most other some such than that this those these what which who whom whose when where how all any both here there'.split(' '));
+
+/* ══════════════════════════════════════════════════════
+   1. INGESTION LAYER
+   ══════════════════════════════════════════════════════ */
+function ingestText(text, name) {
+  const sentences = splitSentences(text);
+  const tokens = tokenize(text);
+  STATE.corpus.push({ name, text, tokens, sentences });
+}
+
+function splitSentences(text) {
+  return text.match(/[^.!?]+[.!?]+/g)?.map(s => s.trim()).filter(s => s.length > 5) || [text];
+}
+
+function tokenize(text, keepStops = false) {
+  const words = text.toLowerCase().replace(/[^a-z0-9\s'-]/g,' ').split(/\s+/).filter(w => w.length > 1);
+  return keepStops ? words : words.filter(w => !STOPWORDS.has(w));
+}
+
+function parseCSV(text) {
+  // Try to extract text column, else join all cells
+  const lines = text.trim().split('\n');
+  return lines.slice(1).map(l => l.replace(/"/g,' ').replace(/,/g,' ')).join(' ');
+}
+
+function parseJSON(text) {
+  try {
+    const obj = JSON.parse(text);
+    const str = JSON.stringify(obj);
+    return str.replace(/[{}\[\]",]/g,' ');
+  } catch(e) { return text; }
+}
+
+async function readFile(file) {
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = e => res(e.target.result);
+    fr.onerror = rej;
+    fr.readAsText(file);
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   2. ANALYSIS ENGINE
+   ══════════════════════════════════════════════════════ */
+function runAnalysis() {
+  buildFrequency();
+  buildBigrams();
+  buildCollocates();
+  buildSegments();
+  buildTopics();
+  buildStats();
+  STATE.ready = true;
+}
+
+function buildFrequency() {
+  STATE.freq.clear();
+  STATE.freqRel.clear();
+  let total = 0;
+  STATE.corpus.forEach(doc => {
+    doc.tokens.forEach(t => {
+      STATE.freq.set(t, (STATE.freq.get(t) || 0) + 1);
+      total++;
+    });
+  });
+  STATE.freq.forEach((v, k) => STATE.freqRel.set(k, v / total));
+}
+
+function buildBigrams() {
+  STATE.bigrams.clear();
+  STATE.corpus.forEach(doc => {
+    for (let i = 0; i < doc.tokens.length - 1; i++) {
+      const bg = doc.tokens[i] + ' ' + doc.tokens[i+1];
+      STATE.bigrams.set(bg, (STATE.bigrams.get(bg) || 0) + 1);
+    }
+  });
+}
+
+function buildCollocates() {
+  STATE.collocates.clear();
+  const window = 5;
+  STATE.corpus.forEach(doc => {
+    const tks = doc.tokens;
+    for (let i = 0; i < tks.length; i++) {
+      const pivot = tks[i];
+      if (!STATE.collocates.has(pivot)) STATE.collocates.set(pivot, new Map());
+      const cm = STATE.collocates.get(pivot);
+      for (let j = Math.max(0, i-window); j <= Math.min(tks.length-1, i+window); j++) {
+        if (j === i) continue;
+        const ctx = tks[j];
+        cm.set(ctx, (cm.get(ctx) || 0) + 1);
+      }
+    }
+  });
+}
+
+function buildSegments(n = 10) {
+  const allTokens = STATE.corpus.flatMap(d => d.tokens);
+  const segSize = Math.ceil(allTokens.length / n);
+  STATE.segments = [];
+  for (let i = 0; i < n; i++) {
+    const slice = allTokens.slice(i * segSize, (i+1) * segSize);
+    const freq = new Map();
+    slice.forEach(t => freq.set(t, (freq.get(t)||0)+1));
+    STATE.segments.push({ tokens: slice, freq, total: slice.length });
+  }
+}
+
+/* Simplified LDA via Gibbs-like assignment */
+function buildTopics(K = 6, iterations = 40) {
+  const vocab = [...STATE.freq.entries()].sort((a,b) => b[1]-a[1]).slice(0,200).map(e=>e[0]);
+  const vIdx = new Map(vocab.map((w,i)=>[w,i]));
+  const docs = STATE.corpus.map(d => d.tokens.filter(t => vIdx.has(t)).map(t => vIdx.get(t)));
+  if (!docs.some(d=>d.length>0)) { STATE.topics=[]; return; }
+
+  const alpha=0.1, beta=0.01;
+  const V=vocab.length;
+  const topicWord = Array.from({length:K}, ()=>new Float32Array(V).fill(beta));
+  const docTopic  = docs.map(()=>new Float32Array(K).fill(alpha));
+  const topicSum  = new Float32Array(K).fill(beta*V);
+
+  // Random init
+  const assignments = docs.map(doc => doc.map(()=>Math.floor(Math.random()*K)));
+  docs.forEach((doc,di)=>{
+    doc.forEach((w,wi)=>{
+      const t = assignments[di][wi];
+      topicWord[t][w]++; topicSum[t]++; docTopic[di][t]++;
+    });
+  });
+
+  // Gibbs sweeps
+  for(let iter=0;iter<iterations;iter++){
+    docs.forEach((doc,di)=>{
+      doc.forEach((w,wi)=>{
+        const oldT = assignments[di][wi];
+        topicWord[oldT][w]--; topicSum[oldT]--; docTopic[di][oldT]--;
+        const probs = new Float32Array(K);
+        let sum=0;
+        for(let k=0;k<K;k++){
+          probs[k]=(topicWord[k][w]/topicSum[k])*(docTopic[di][k]);
+          sum+=probs[k];
+        }
+        let r=Math.random()*sum, cumul=0, newT=0;
+        for(let k=0;k<K;k++){ cumul+=probs[k]; if(r<=cumul){newT=k;break;} }
+        assignments[di][wi]=newT;
+        topicWord[newT][w]++; topicSum[newT]++; docTopic[di][newT]++;
+      });
+    });
+  }
+
+  STATE.topics = Array.from({length:K}, (_,k)=>{
+    const pairs = vocab.map((w,i)=>({word:w, weight:topicWord[k][i]/topicSum[k]}));
+    pairs.sort((a,b)=>b.weight-a.weight);
+    return { id:k, terms: pairs.slice(0,8) };
+  });
+  STATE.topicDocs = docs.map((_,di)=>{
+    const row = Array.from({length:K},(_,k)=>docTopic[di][k]);
+    const s = row.reduce((a,b)=>a+b,0)||1;
+    return row.map(v=>v/s);
+  });
+}
+
+function buildStats() {
+  const allSentences = STATE.corpus.flatMap(d => d.sentences);
+  STATE.sentences = allSentences;
+  const allTokensRaw = STATE.corpus.flatMap(d => tokenize(d.text, true));
+  STATE.stats = {
+    docs: STATE.corpus.length,
+    tokens: STATE.freq.size > 0 ? [...STATE.freq.values()].reduce((a,b)=>a+b,0) : 0,
+    types: STATE.freq.size,
+    avgSentLen: allSentences.length ? +(allSentences.map(s=>s.split(/\s+/).length).reduce((a,b)=>a+b,0)/allSentences.length).toFixed(1) : 0,
+    avgWordLen: allTokensRaw.length ? +(allTokensRaw.map(w=>w.length).reduce((a,b)=>a+b,0)/allTokensRaw.length).toFixed(1) : 0,
+  };
+  STATE.stats.ttr = STATE.stats.tokens ? (STATE.stats.types/STATE.stats.tokens).toFixed(3) : '—';
+}
+
+/* ══════════════════════════════════════════════════════
+   3. VISUALISATION LAYER
+   ══════════════════════════════════════════════════════ */
+
+/* helper */
+function clearPanel(id) {
+  const el = document.getElementById(id);
+  el.innerHTML = '';
+  return el;
+}
+function fmtNum(n) { return n >= 1000 ? (n/1000).toFixed(1)+'k' : String(n); }
+
+/* ── 3a. CORPUS STATS ── */
+function renderStats() {
+  const s = STATE.stats;
+  document.getElementById('stat-docs').textContent    = s.docs;
+  document.getElementById('stat-tokens').textContent  = fmtNum(s.tokens);
+  document.getElementById('stat-types').textContent   = fmtNum(s.types);
+  document.getElementById('stat-ttr').textContent     = s.ttr;
+  document.getElementById('stat-avgsen').textContent  = s.avgSentLen + ' words';
+  document.getElementById('stat-avgword').textContent = s.avgWordLen + ' chars';
+}
+
+/* ── 3b. CIRRUS WORD CLOUD (D3 force) ── */
+function renderCirrus() {
+  const body = clearPanel('cirrus-body');
+  const top = [...STATE.freq.entries()].sort((a,b)=>b[1]-a[1]).slice(0,80);
+  const max = top[0][1], min = top[top.length-1][1];
+  document.getElementById('cirrus-count').textContent = top.length + ' terms';
+
+  const W = body.offsetWidth || 500;
+  const H = body.offsetHeight || 400;
+
+  const svg = d3.select(body).append('svg')
+    .attr('width', W).attr('height', H)
+    .style('position','absolute').style('inset','0');
+
+  const scale = d3.scaleLinear().domain([min,max]).range([11,38]);
+  const color = d3.scaleSequential(d3.interpolateCool).domain([0, top.length]);
+
+  const nodes = top.map(([word, count], i) => ({
+    word, count, i,
+    fs: scale(count),
+    x: W/2 + (Math.random()-0.5)*W*0.6,
+    y: H/2 + (Math.random()-0.5)*H*0.6
+  }));
+
+  const texts = svg.selectAll('text')
+    .data(nodes).enter().append('text')
+    .text(d => d.word)
+    .attr('font-size', d => d.fs)
+    .attr('font-family', 'var(--font-display)')
+    .attr('fill', (d,i) => color(i))
+    .attr('text-anchor','middle')
+    .attr('dominant-baseline','middle')
+    .attr('x', d => d.x).attr('y', d => d.y)
+    .style('cursor','pointer')
+    .style('opacity', 0.85)
+    .on('click', (_,d) => setSelectedWord(d.word))
+    .on('mouseover', function(){ d3.select(this).style('opacity',1).attr('font-weight','600'); })
+    .on('mouseout', function(){ d3.select(this).style('opacity',0.85).attr('font-weight','normal'); });
+
+  const sim = d3.forceSimulation(nodes)
+    .force('center', d3.forceCenter(W/2, H/2).strength(0.15))
+    .force('charge', d3.forceManyBody().strength(-25))
+    .force('collision', d3.forceCollide(d => d.fs * 0.65 + 4))
+    .on('tick', () => {
+      texts.attr('x', d => Math.max(d.fs, Math.min(W-d.fs, d.x)))
+           .attr('y', d => Math.max(d.fs, Math.min(H-d.fs, d.y)));
+    });
+
+  // stop sim after settling to save CPU
+  setTimeout(()=>sim.stop(), 3000);
+}
+
+/* ── 3c. TRENDS STREAMGRAPH (D3 area) ── */
+function renderTrends(words = null) {
+  const body = clearPanel('trends-body');
+  if (!STATE.segments.length) return;
+
+  // pick top 8 words if none specified
+  const topWords = words || [...STATE.freq.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8).map(e=>e[0]);
+  document.getElementById('trends-info').textContent = topWords.length + ' terms';
+
+  const W = body.offsetWidth || 600;
+  const H = body.offsetHeight || 300;
+  const margin = {top:10, right:10, bottom:22, left:36};
+  const iW = W - margin.left - margin.right;
+  const iH = H - margin.top - margin.bottom;
+
+  // word pills row
+  const pills = document.createElement('div');
+  pills.style.cssText='display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;position:relative;z-index:1;flex-shrink:0;';
+  topWords.forEach(w => {
+    const p = document.createElement('span');
+    p.className='word-pill' + (w===STATE.selectedWord?' selected':'');
+    p.textContent=w;
+    p.onclick = () => setSelectedWord(w);
+    pills.appendChild(p);
+  });
+  body.appendChild(pills);
+
+  const svgWrap = document.createElement('div');
+  svgWrap.style.cssText = 'flex:1;position:relative;min-height:0;width:100%;';
+  body.appendChild(svgWrap);
+
+  const svg = d3.select(svgWrap).append('svg')
+    .attr('width','100%').attr('height','100%')
+    .attr('viewBox', `0 0 ${W} ${H}`);
+
+  const g = svg.append('g').attr('transform',`translate(${margin.left},${margin.top})`);
+
+  const data = STATE.segments.map((seg, si) => {
+    const obj = { seg: si };
+    topWords.forEach(w => { obj[w] = (seg.freq.get(w)||0) / (seg.total||1) * 1000; });
+    return obj;
+  });
+
+  const x = d3.scaleLinear().domain([0, STATE.segments.length-1]).range([0, iW]);
+  const maxY = d3.max(data, d => topWords.reduce((s,w)=>s+(d[w]||0),0));
+  const y = d3.scaleLinear().domain([0, maxY*1.05]).range([iH, 0]);
+  const colorScale = d3.scaleOrdinal().domain(topWords).range(['#a78bfa','#34d399','#fb923c','#f472b6','#38bdf8','#fbbf24','#f87171','#4ade80']);
+
+  const stack = d3.stack().keys(topWords).order(d3.stackOrderNone).offset(d3.stackOffsetNone);
+  const series = stack(data);
+  const area = d3.area().x(d=>x(d.data.seg)).y0(d=>y(d[0])).y1(d=>y(d[1])).curve(d3.curveCatmullRom);
+
+  g.selectAll('.trend-area').data(series).enter().append('path')
+    .attr('class','trend-area').attr('d',area)
+    .attr('fill',d=>colorScale(d.key)).attr('opacity',0.75)
+    .on('mouseover',function(_,d){ d3.select(this).attr('opacity',1); })
+    .on('mouseout',function(){ d3.select(this).attr('opacity',0.75); })
+    .on('click',(_,d)=>setSelectedWord(d.key));
+
+  // axes
+  g.append('g').attr('transform',`translate(0,${iH})`).call(d3.axisBottom(x).ticks(5).tickFormat(d=>`seg${d+1}`))
+    .selectAll('text').attr('fill','var(--text-muted)').attr('font-size',9);
+  g.selectAll('.domain,.tick line').attr('stroke','var(--border)');
+  g.append('g').call(d3.axisLeft(y).ticks(4).tickFormat(d=>d.toFixed(0)))
+    .selectAll('text').attr('fill','var(--text-muted)').attr('font-size',9);
+  g.selectAll('.domain').attr('stroke','var(--border)');
+}
+
+/* ── 3d. BUBBLE LINES ── */
+function renderBubbles(words = null) {
+  const body = clearPanel('bubbles-body');
+  const topWords = words || [...STATE.freq.entries()].sort((a,b)=>b[1]-a[1]).slice(0,12).map(e=>e[0]);
+  const colorScale = d3.scaleOrdinal().domain(topWords).range(['#a78bfa','#34d399','#fb923c','#f472b6','#38bdf8','#fbbf24','#f87171','#4ade80','#e879f9','#2dd4bf','#f59e0b','#60a5fa']);
+
+  const allTokensWithPos = [];
+  STATE.corpus.forEach(doc => {
+    doc.tokens.forEach((t,i) => allTokensWithPos.push({ t, i, doc: doc.name }));
+  });
+  const total = allTokensWithPos.length;
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText='position:relative;z-index:1;width:100%;';
+  body.appendChild(wrap);
+
+  topWords.forEach(word => {
+    const row = document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:6px;margin-bottom:5px;';
+
+    const label = document.createElement('div');
+    label.style.cssText=`width:80px;font-size:10px;color:${colorScale(word)};text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;`;
+    label.textContent=word;
+    label.title=word;
+    label.onclick=()=>setSelectedWord(word);
+    row.appendChild(label);
+
+    const track = document.createElement('div');
+    track.style.cssText='flex:1;height:12px;background:var(--bg-elevated);border-radius:6px;position:relative;overflow:hidden;cursor:pointer;';
+    track.onclick=()=>setSelectedWord(word);
+
+    const positions = allTokensWithPos.filter(p=>p.t===word).map(p=>p.i/total);
+    positions.forEach(pos => {
+      const dot = document.createElement('div');
+      dot.style.cssText=`position:absolute;top:2px;width:8px;height:8px;border-radius:50%;background:${colorScale(word)};left:calc(${pos*100}% - 4px);opacity:0.8;`;
+      track.appendChild(dot);
+    });
+
+    const count = document.createElement('div');
+    count.style.cssText='width:30px;font-size:10px;color:var(--text-muted);flex-shrink:0;text-align:right;';
+    count.textContent = STATE.freq.get(word)||0;
+
+    row.appendChild(track);
+    row.appendChild(count);
+    wrap.appendChild(row);
+  });
+}
+
+/* ── 3e. TOPIC HEATMAP ── */
+function renderTopics() {
+  const body = clearPanel('topics-body');
+  if (!STATE.topics.length) { body.innerHTML='<div class="empty-label" style="position:relative;z-index:1"><span>Not enough text for topics</span></div>'; return; }
+  document.getElementById('topics-k').textContent = STATE.topics.length + ' topics';
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText='position:relative;z-index:1;width:100%;';
+  body.appendChild(wrap);
+
+  // Topic term cards
+  const cardsRow = document.createElement('div');
+  cardsRow.style.cssText='display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;';
+  const topicColors = ['#a78bfa','#34d399','#fb923c','#f472b6','#38bdf8','#fbbf24'];
+
+  STATE.topics.forEach((topic,k) => {
+    const card = document.createElement('div');
+    const col = topicColors[k % topicColors.length];
+    card.style.cssText=`border:0.5px solid ${col}33;border-radius:var(--r-sm);padding:6px 8px;min-width:120px;`;
+    const title = document.createElement('div');
+    title.style.cssText=`font-size:10px;color:${col};margin-bottom:4px;font-family:var(--font-display);letter-spacing:0.06em;`;
+    title.textContent=`Topic ${k+1}`;
+    card.appendChild(title);
+    topic.terms.slice(0,5).forEach(t => {
+      const tw = document.createElement('div');
+      tw.style.cssText=`font-size:11px;color:var(--text-secondary);cursor:pointer;padding:1px 0;`;
+      tw.textContent=t.word;
+      tw.onclick=()=>setSelectedWord(t.word);
+      card.appendChild(tw);
+    });
+    cardsRow.appendChild(card);
+  });
+  wrap.appendChild(cardsRow);
+
+  // Heatmap: docs × topics
+  if (!STATE.topicDocs || !STATE.topicDocs.length) return;
+  const hm = document.createElement('div');
+  hm.style.cssText='overflow-x:auto;';
+  const K = STATE.topics.length;
+  const docCount = STATE.corpus.length;
+
+  const table = document.createElement('table');
+  table.style.cssText='border-collapse:collapse;font-size:10px;';
+  // header
+  const thead = document.createElement('tr');
+  thead.appendChild(Object.assign(document.createElement('td'),{style:'padding:3px 6px;color:var(--text-muted);',textContent:'Doc'}));
+  STATE.topics.forEach((_,k) => {
+    const th = document.createElement('td');
+    th.style.cssText=`padding:3px 6px;color:${topicColors[k%topicColors.length]};text-align:center;`;
+    th.textContent=`T${k+1}`;
+    thead.appendChild(th);
+  });
+  table.appendChild(thead);
+
+  STATE.topicDocs.forEach((row, di) => {
+    const tr = document.createElement('tr');
+    const docName = STATE.corpus[di]?.name || `Doc ${di+1}`;
+    tr.appendChild(Object.assign(document.createElement('td'),{style:'padding:3px 6px;color:var(--text-secondary);white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis;',textContent:docName}));
+    row.forEach((v,k) => {
+      const td = document.createElement('td');
+      const col = topicColors[k%topicColors.length];
+      const a = Math.min(1, v * 3);
+      td.style.cssText=`padding:3px 6px;text-align:center;background:${col}${Math.round(a*40).toString(16).padStart(2,'0')};color:${a>0.4?col:'var(--text-muted)'};border-radius:2px;`;
+      td.textContent=v>0.01?(v*100).toFixed(0)+'%':'·';
+      tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  });
+  hm.appendChild(table);
+  wrap.appendChild(hm);
+}
+
+/* ── 3f. MANDALA / WORD TREE (D3 radial) ── */
+function renderMandala(word) {
+  if (!word) return;
+  const body = clearPanel('mandala-body');
+  document.getElementById('mandala-word').textContent = word;
+
+  const W = body.offsetWidth || 500;
+  const H = body.offsetHeight || 400;
+  const cx = W/2, cy = H/2;
+
+  const colMap = STATE.collocates.get(word);
+  if (!colMap || colMap.size === 0) {
+    body.innerHTML = '<div class="empty-label" style="position:relative;z-index:1"><span>No collocate data</span></div>';
+    return;
+  }
+
+  const topCol = [...colMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,24);
+  const maxW = topCol[0][1];
+
+  const svg = d3.select(body).append('svg')
+    .attr('width', W).attr('height', H)
+    .style('position','absolute').style('inset','0');
+
+  const angleStep = (2 * Math.PI) / topCol.length;
+  const rScale = d3.scaleLinear().domain([0,maxW]).range([0.35,0.85]);
+  const sizeScale = d3.scaleLinear().domain([0,maxW]).range([9,18]);
+  const colorScale = d3.scaleSequential(d3.interpolatePlasma).domain([0, topCol.length]);
+
+  // center node
+  svg.append('circle').attr('cx',cx).attr('cy',cy).attr('r',28).attr('fill','var(--bg-elevated)').attr('stroke','var(--border-active)').attr('stroke-width',1);
+  svg.append('text').attr('x',cx).attr('y',cy).attr('text-anchor','middle').attr('dominant-baseline','middle').attr('fill','var(--text-accent)').attr('font-family','var(--font-display)').attr('font-size',13).text(word);
+
+  // rings
+  [0.3,0.55,0.82].forEach(r => {
+    svg.append('circle').attr('cx',cx).attr('cy',cy).attr('r',r*Math.min(W,H)*0.45).attr('fill','none').attr('stroke','var(--border)').attr('stroke-width',0.5).attr('stroke-dasharray','3,4');
+  });
+
+  topCol.forEach(([ctx, cnt], i) => {
+    const angle = i * angleStep - Math.PI/2;
+    const r = rScale(cnt) * Math.min(W,H) * 0.45;
+    const nx = cx + Math.cos(angle) * r;
+    const ny = cy + Math.sin(angle) * r;
+    const col = colorScale(i);
+
+    // line
+    svg.append('line').attr('x1',cx).attr('y1',cy).attr('x2',nx).attr('y2',ny)
+      .attr('stroke',col).attr('stroke-width', cnt/maxW*2+0.5).attr('opacity',0.4);
+
+    // node
+    const gr = svg.append('g').style('cursor','pointer')
+      .on('click',()=>setSelectedWord(ctx))
+      .on('mouseover',function(){ d3.select(this).select('circle').attr('opacity',1); d3.select(this).select('text').attr('opacity',1); })
+      .on('mouseout',function(){ d3.select(this).select('circle').attr('opacity',0.7); d3.select(this).select('text').attr('opacity',0.85); });
+
+    gr.append('circle').attr('cx',nx).attr('cy',ny).attr('r',sizeScale(cnt)).attr('fill',col).attr('opacity',0.7);
+    gr.append('text').attr('x',nx).attr('y',ny).attr('text-anchor','middle').attr('dominant-baseline','middle')
+      .attr('fill','#fff').attr('font-size',9).attr('opacity',0.85).text(ctx.length>8?ctx.slice(0,7)+'…':ctx);
+  });
+}
+
+/* ── 3g. KWIC ── */
+function renderKWIC(word) {
+  if (!word) return;
+  const body = clearPanel('kwic-body');
+  document.getElementById('kwic-word-label').textContent = word;
+
+  const ctx = 5;
+  const hits = [];
+  STATE.corpus.forEach(doc => {
+    const tks = tokenize(doc.text, true);
+    tks.forEach((t,i) => {
+      if (t.toLowerCase() === word.toLowerCase()) {
+        hits.push({
+          left: tks.slice(Math.max(0,i-ctx),i).join(' '),
+          kw: tks[i],
+          right: tks.slice(i+1,i+1+ctx).join(' ')
+        });
+      }
+    });
+  });
+
+  if (!hits.length) {
+    body.innerHTML='<div style="color:var(--text-muted);font-size:11px;position:relative;z-index:1">No occurrences found</div>';
+    return;
+  }
+
+  const table = document.createElement('table');
+  table.className='kwic-table';
+  table.style.cssText='position:relative;z-index:1;';
+  hits.slice(0,80).forEach(h => {
+    const tr = document.createElement('tr');
+    tr.innerHTML=`<td class="kwic-left">${h.left}</td><td class="kwic-kw">${h.kw}</td><td class="kwic-right">${h.right}</td>`;
+    table.appendChild(tr);
+  });
+  body.appendChild(table);
+}
+
+/* ── 3h. SENTENCE PATTERNS ── */
+function runPattern() {
+  const input = document.getElementById('pattern-input').value.trim();
+  const results = document.getElementById('pattern-results');
+  results.innerHTML = '';
+
+  if (!STATE.ready || !input) return;
+
+  let rx;
+  try { rx = new RegExp(input, 'gi'); }
+  catch(e) { results.innerHTML=`<div style="color:#f87171;font-size:11px;position:relative;z-index:1">Invalid regex: ${e.message}</div>`; return; }
+
+  const hits = [];
+  STATE.sentences.forEach(s => {
+    if (rx.test(s)) hits.push(s);
+    rx.lastIndex=0;
+  });
+
+  if (!hits.length) {
+    results.innerHTML='<div style="color:var(--text-muted);font-size:11px;position:relative;z-index:1">No matches</div>';
+    return;
+  }
+
+  hits.slice(0,40).forEach(s => {
+    const div = document.createElement('div');
+    div.className='pattern-hit';
+    div.style.cssText='position:relative;z-index:1;';
+    const highlighted = s.replace(new RegExp(input,'gi'), m => `<mark>${m}</mark>`);
+    div.innerHTML = highlighted;
+    results.appendChild(div);
+  });
+  const info = document.createElement('div');
+  info.style.cssText='font-size:10px;color:var(--text-muted);position:relative;z-index:1;margin-top:4px;';
+  info.textContent = `${hits.length} sentence${hits.length!==1?'s':''} matched`;
+  results.appendChild(info);
+}
+
+/* ══════════════════════════════════════════════════════
+   4. REACTIVE WORD SELECTION
+   ══════════════════════════════════════════════════════ */
+function setSelectedWord(word) {
+  STATE.selectedWord = word;
+  document.getElementById('sw-label').textContent = word;
+  document.getElementById('selected-word-bar').classList.add('visible');
+  renderKWIC(word);
+  renderMandala(word);
+  // Re-render trends highlighting this word
+  renderTrends([word, ...[...STATE.freq.entries()].sort((a,b)=>b[1]-a[1]).filter(e=>e[0]!==word).slice(0,7).map(e=>e[0])]);
+}
+
+/* ══════════════════════════════════════════════════════
+   5. RENDER ALL PANELS
+   ══════════════════════════════════════════════════════ */
+function renderAll() {
+  renderStats();
+  renderCirrus();
+  renderTrends();
+  renderBubbles();
+  renderTopics();
+  // Pick top word for initial mandala and KWIC
+  const topWord = [...STATE.freq.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0];
+  if (topWord) setSelectedWord(topWord);
+}
+
+/* ══════════════════════════════════════════════════════
+   6. UPLOAD & ANALYSIS PIPELINE
+   ══════════════════════════════════════════════════════ */
+function toggleUploadPanel() {
+  STATE.uploadPanelVisible = !STATE.uploadPanelVisible;
+  document.getElementById('upload-panel').style.display = STATE.uploadPanelVisible ? 'flex' : 'none';
+  document.querySelector('.sm-btn[data-tip="Upload corpus"]').classList.toggle('active', STATE.uploadPanelVisible);
+}
+
+function scrollToPanel(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center' });
+}
+
+function toggleCard(id) {
+  const bodyId = id==='card-upload'?'body-upload':'body-files';
+  const chevId = id==='card-upload'?'chevron1':'chevron2';
+  const body = document.getElementById(bodyId), chev = document.getElementById(chevId);
+  const c = body.classList.toggle('collapsed');
+  chev.classList.toggle('collapsed',c);
+}
+function expandCard(id) {
+  const bodyId=id==='card-upload'?'body-upload':'body-files', chevId=id==='card-upload'?'chevron1':'chevron2';
+  document.getElementById(bodyId).classList.remove('collapsed');
+  document.getElementById(chevId).classList.remove('collapsed');
+}
+function collapseCard(id) {
+  const bodyId=id==='card-upload'?'body-upload':'body-files', chevId=id==='card-upload'?'chevron1':'chevron2';
+  document.getElementById(bodyId).classList.add('collapsed');
+  document.getElementById(chevId).classList.add('collapsed');
+}
+
+function handleDragOver(e){ e.preventDefault(); document.getElementById('drop-zone').classList.add('dragover'); }
+function handleDragLeave(){ document.getElementById('drop-zone').classList.remove('dragover'); }
+function handleDrop(e){ e.preventDefault(); document.getElementById('drop-zone').classList.remove('dragover'); processFiles([...e.dataTransfer.files]); }
+function handleFileInput(e){ processFiles([...e.target.files]); e.target.value=''; }
+function handlePaste(el) {
+  if (el.value.trim().length > 20) {
+    STATE.uploadedFiles.push({ name:'pasted-text.txt', _text: el.value, size: el.value.length });
+    renderFileList();
+    expandCard('card-files');
+    updateStepNodes(true, false);
+    setTimeout(()=>{ el.value=''; },800);
+  }
+}
+
+function processFiles(files) { files.forEach(f => simulateUpload(f)); }
+
+function simulateUpload(file) {
+  const pw=document.getElementById('progress-wrap'), pf=document.getElementById('progress-fill'),
+        pp=document.getElementById('progress-pct'), fn=document.getElementById('progress-filename');
+  fn.textContent=file.name; pf.style.width='0%'; pf.classList.remove('done'); pp.textContent='0%'; pw.classList.add('visible');
+  let pct=0;
+  const iv = setInterval(()=>{
+    pct += Math.random()*20+5;
+    if(pct>=100){ pct=100; clearInterval(iv); pf.classList.add('done'); pp.textContent='100%';
+      setTimeout(()=>{ STATE.uploadedFiles.push(file); renderFileList(); expandCard('card-files'); updateStepNodes(true,false); pw.classList.remove('visible'); },400); }
+    pf.style.width=pct+'%'; pp.textContent=Math.round(pct)+'%';
+  },80);
+}
+
+function renderFileList() {
+  const list=document.getElementById('file-list'), btn=document.getElementById('btn-analyse');
+  list.innerHTML='';
+  STATE.uploadedFiles.forEach((f,i)=>{
+    const ext=f.name.split('.').pop().toUpperCase().slice(0,3);
+    const size=f.size<1024?f.size+'B':f.size<1024*1024?(f.size/1024).toFixed(1)+'KB':(f.size/1024/1024).toFixed(1)+'MB';
+    const item=document.createElement('div'); item.className='file-item';
+    item.innerHTML=`<div class="file-thumb">${ext}</div><div class="file-name" title="${f.name}">${f.name}</div><div class="file-size">${size}</div><button class="file-remove" onclick="removeFile(${i})">✕</button>`;
+    list.appendChild(item);
+  });
+  btn.disabled=STATE.uploadedFiles.length===0;
+}
+
+function removeFile(idx){ STATE.uploadedFiles.splice(idx,1); renderFileList(); if(!STATE.uploadedFiles.length){updateStepNodes(false,false);collapseCard('card-files');} }
+
+function updateStepNodes(ud,ad){
+  const n1=document.getElementById('snode1'),n2=document.getElementById('snode2'),l1=document.getElementById('sline1'),b1=document.getElementById('step1-badge'),b2=document.getElementById('step2-badge');
+  n1.className='step-node '+(ud?'done':'active'); l1.className='step-line '+(ud?'done':''); n2.className='step-node '+(ad?'done':ud?'active':'');
+  b1.style.cssText=ud?'background:var(--success-soft);border-color:var(--success);color:var(--success);':'background:var(--accent-soft);border-color:var(--accent);color:var(--accent);';
+  b2.style.cssText=ad?'background:var(--success-soft);border-color:var(--success);color:var(--success);':ud?'background:var(--accent-soft);border-color:var(--accent);color:var(--accent);':'';
+}
+
+const ANALYSIS_STEPS = ['Parsing files…','Tokenising corpus…','Building frequency index…','Computing collocates…','Segmenting for trends…','Running LDA topics…','Rendering visualisations…','Done ✓'];
+
+async function startAnalysis() {
+  const btn=document.getElementById('btn-analyse'), apw=document.getElementById('analyse-progress'), asts=document.getElementById('analyse-steps');
+  btn.disabled=true; btn.innerHTML='<span>Analysing…</span>'; apw.classList.add('visible'); asts.innerHTML='';
+
+  ANALYSIS_STEPS.forEach((label,i)=>{
+    const row=document.createElement('div'); row.className='analyse-step-row'; row.id='astep-'+i;
+    row.innerHTML=`<span class="analyse-step-icon">○</span><span>${label}</span>`; asts.appendChild(row);
+  });
+
+  // Step 0: parse files
+  await animStep(0);
+  STATE.corpus = [];
+  for (const file of STATE.uploadedFiles) {
+    let text = '';
+    if (file._text) { text = file._text; }
+    else {
+      try { text = await readFile(file); } catch(e){ continue; }
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (ext==='csv') text = parseCSV(text);
+      else if (ext==='json') text = parseJSON(text);
+    }
+    ingestText(text, file.name);
+  }
+
+  await animStep(1);
+  await animStep(2); buildFrequency();
+  await animStep(3); buildBigrams(); buildCollocates();
+  await animStep(4); buildSegments();
+  await animStep(5); buildTopics();
+
+  await animStep(6);
+  buildStats();
+  STATE.ready=true;
+  renderAll();
+
+  await animStep(7);
+  updateStepNodes(true,true);
+  setTimeout(()=>{ collapseCard('card-upload'); collapseCard('card-files'); },1200);
+}
+
+function animStep(i) {
+  return new Promise(res => {
+    if(i>0){ const prev=document.getElementById('astep-'+(i-1)); if(prev){prev.classList.remove('active');prev.classList.add('done');prev.querySelector('.analyse-step-icon').textContent='✓';} }
+    const cur=document.getElementById('astep-'+i); if(cur){cur.classList.add('active');cur.querySelector('.analyse-step-icon').textContent='›';}
+    setTimeout(res, 350+Math.random()*250);
+  });
+}
+
+function exportCSV() {
+  if(!STATE.ready){ alert('Run analysis first'); return; }
+  const rows=[['term','frequency','relative_freq']];
+  [...STATE.freq.entries()].sort((a,b)=>b[1]-a[1]).forEach(([t,c])=>rows.push([t,c,(STATE.freqRel.get(t)*1000).toFixed(4)]));
+  const csv=rows.map(r=>r.join(',')).join('\n');
+  const a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv); a.download='lexis_freq.csv'; a.click();
+}
+
+/* handle enter in pattern input */
+document.getElementById('pattern-input').addEventListener('keydown', e => { if(e.key==='Enter') runPattern(); });
+
+/* ── DEMO corpus (so the tool works immediately without uploading) ── */
+(function loadDemo(){
+  const demo = `The quick brown fox jumps over the lazy dog. A fox is a cunning animal that lives in forests and fields. The fox was known for its cleverness and speed. Many foxes were seen near the river at dawn. The lazy dog watched as the fox disappeared into the woods. Language is the most remarkable tool humans have developed. Words carry meaning across time and space. The structure of sentences reveals the structure of thought. Every text contains patterns waiting to be discovered. Analysis of language opens windows into culture and cognition. The frequency of words reflects the concerns of an era. Text mining reveals hidden relationships between concepts. Digital humanities combines computational methods with literary analysis. Corpus linguistics studies language through large collections of text. Natural language processing enables computers to understand human communication. Patterns emerge from the chaos of everyday speech. The mind constructs meaning from sequences of symbols. Reading is a cognitive act of extraordinary complexity. Writing transforms thought into a permanent record. Books preserve the voices of the dead for the living.`;
+  ingestText(demo, 'demo-corpus.txt');
+  ingestText(`Science and technology transform the world at an accelerating pace. The discovery of new phenomena drives human curiosity forward. Experiments test hypotheses against the hard reality of nature. Data emerges from observation and measurement. Theories explain patterns observed across many experiments. The scientific method is a powerful engine of knowledge. Physics reveals the fundamental laws governing matter and energy. Biology explores the diversity and unity of life. Chemistry unlocks the properties of substances and their transformations. Mathematics provides the language in which science speaks.`, 'demo-science.txt');
+  STATE.uploadedFiles=[{name:'demo-corpus.txt',size:demo.length},{name:'demo-science.txt',size:200}];
+  renderFileList(); expandCard('card-files'); updateStepNodes(true,false);
+  // auto-run after short delay
+  setTimeout(()=>{
+    STATE.corpus=[];
+    ingestText(demo,'demo-corpus.txt');
+    ingestText(`Science and technology transform the world at an accelerating pace. The discovery of new phenomena drives human curiosity forward. Experiments test hypotheses against the hard reality of nature. Data emerges from observation and measurement. Theories explain patterns observed across many experiments. The scientific method is a powerful engine of knowledge. Physics reveals the fundamental laws governing matter and energy. Biology explores the diversity and unity of life. Chemistry unlocks the properties of substances and their transformations. Mathematics provides the language in which science speaks.`,'demo-science.txt');
+    runAnalysis();
+    renderAll();
+    updateStepNodes(true,true);
+    collapseCard('card-upload'); collapseCard('card-files');
+  },600);
+})();
+
+updateStepNodes(false,false);
+</script>
+</body>
+</html>
