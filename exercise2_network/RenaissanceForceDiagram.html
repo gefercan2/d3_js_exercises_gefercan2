@@ -72,7 +72,8 @@ html, body {
 .panel-body { padding: 22px; }
 
 /* Legend */
-.legend-item { display: flex; align-items: center; margin-bottom: 7px; gap: 8px; font-size: 11px; }
+.legend-item { display: flex; align-items: center; margin-bottom: 7px; gap: 8px; font-size: 1em; }
+.legend-item2 { display: flex; align-items: center; margin-bottom: 7px; gap: 8px; font-size: 0.8em; }
 .legend-item:last-child { margin-bottom: 0; }
 .legend-diamond {
   width:14px; height:14px; background:#ff4444;          /* ← sync with CONFIG.node.artistColor */
@@ -89,9 +90,9 @@ html, body {
 }
 
 /* Panel positions */
-#legendPanel   { top: 70px; left: 18px; }
+#legendPanel   { top: 80px; left: 18px; }
 #timelinePanel { top: 70px; right: 22px; }
-#infoPanel     { top: 350px; left: 18px; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+#infoPanel     { top: 370px; left: 18px; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
 #infoPanel.visible { opacity: 1; pointer-events: auto; }
 
 /* Info panel content */
@@ -126,10 +127,296 @@ html, body {
 /* Circular containment boundary guide (visual only, not a clip) */
 .containment-guide { fill:none; stroke: rgba(102,204,255,0.15); stroke-width: 1.5; stroke-dasharray: 6 6; }
 
+/* ======= SIDEMENU STYLES ==================== */
+	    /* Side Menu Styles */
+        .menu-toggle {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            background-color: #667eea;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 1001;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .menu-toggle:hover {
+            background-color: #5568d3;
+        }
+
+        .menu-toggle span {
+            width: 25px;
+            height: 3px;
+            background-color: white;
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .menu-toggle.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+
+        .menu-toggle.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .menu-toggle.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(7px, -6px);
+        }
+
+        .side-menu {
+            position: fixed;
+            top: 0;
+            right: -65%;
+            width: 65%;
+            height: 100vh;
+            background-color: white;
+            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
+            transition: right 0.4s ease;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .side-menu.active {
+            right: 0;
+        }
+
+        .menu-content {
+            padding: 80px 40px 40px 40px;
+        }
+
+        .menu-options {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .menu-option {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .menu-option:hover {
+            background-color: #e9ecef;
+            border-color: #667eea;
+        }
+
+        .menu-option h2 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 1.5em;
+        }
+
+        .menu-option p {
+            margin: 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .article-view {
+            display: none;
+            padding: 20px;
+        }
+
+        .article-view.active {
+            display: block;
+        }
+
+        .article-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .back-button {
+            background-color: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 20px;
+            transition: background-color 0.3s ease;
+        }
+
+        .back-button:hover {
+            background-color: #5568d3;
+        }
+
+        .article-title {
+            font-size: 2em;
+            color: #333;
+            margin: 0;
+        }
+
+        .article-image {
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .article-content {
+            line-height: 1.8;
+            color: #444;
+            font-size: 1.1em;
+        }
+
+        .article-content p {
+            margin-bottom: 20px;
+            text-align: justify;
+        }
+
+        .article-content h3 {
+            margin-top: 30px;
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+
+       /* Overlay */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 999;
+        }
+
+        .overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+
+
 </style>
 </head>
 
 <body>
+
+
+    <!-- Menu Toggle Button -->
+    <button class="menu-toggle" id="menuToggle">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+  
+    <!-- Overlay -->
+    <div class="overlay" id="overlay"></div>
+
+	 <!-- Side Menu -->
+    <div class="side-menu" id="sideMenu">
+        <div class="menu-content">
+
+            <!-- Main Menu Options -->
+            <div class="menu-options" id="menuOptions">
+                <div class="menu-option" data-article="1">
+                    <h2>The Renaissance Period</h2>
+                    <p>Discover the historical context and cultural significance of the Italian Renaissance</p>
+                </div>
+                <div class="menu-option" data-article="2">
+                    <h2>Renaissance Artists & Techniques</h2>
+                    <p>Explore the innovative artistic techniques and master artists of this golden age</p>
+                </div>
+            </div>
+
+            <!-- Article 1 -->
+            <div class="article-view" id="article1">
+                <div class="article-header">
+                    <button class="back-button" onclick="showMenu()">← Back</button>
+                    <h1 class="article-title">The Renaissance Period</h1>
+                </div>
+                 <!-- <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Van_Eyck_-_Arnolfini_Portrait.jpg/400px-Van_Eyck_-_Arnolfini_Portrait.jpg" alt="Renaissance Art" class="article-image">-->
+                <div class="article-content">
+                    <p>The Italian Renaissance was a period of great cultural change and achievement that began in Italy during the 14th century and lasted until the 17th century. It marked the transition from the Middle Ages to modernity and was characterized by an effort to revive and surpass the ideas and achievements of classical antiquity.</p>
+                    
+                    <h3>Historical Context</h3>
+                    <p>The Renaissance began in Florence, Italy, in the 14th century. The city's wealthy merchants and bankers, particularly the Medici family, became great patrons of the arts and humanities. This patronage system allowed artists, scholars, and thinkers to pursue their work without the burden of financial constraints, leading to an explosion of creativity and innovation.</p>
+                    
+                    <p>The period saw the rise of humanism, a movement that emphasized the value and agency of human beings and favored critical thinking and evidence over acceptance of religious dogma. Humanist scholars studied classical texts from ancient Greece and Rome, seeking to understand and emulate the achievements of these ancient civilizations.</p>
+                    
+                    <h3>Cultural Significance</h3>
+                    <p>The Renaissance had a profound impact on European culture, transforming art, architecture, politics, science, and literature. It represented a rebirth of classical learning and wisdom after the stagnation of the Middle Ages. The period witnessed the emergence of a new approach to art that emphasized naturalism, perspective, and the human form.</p>
+                    
+                    <p>Artists began to see themselves as intellectuals rather than mere craftsmen, and their work reflected a deep understanding of anatomy, mathematics, and the natural world. The invention of linear perspective revolutionized painting, allowing artists to create the illusion of three-dimensional space on a two-dimensional surface.</p>
+                    
+                    <h3>Major City-States</h3>
+                    <p>Italy during the Renaissance was not a unified nation but rather a collection of independent city-states, each with its own government, culture, and artistic traditions. Florence, Venice, Rome, Milan, and Naples were among the most powerful and influential of these city-states.</p>
+                    
+                    <p>Florence, under the rule of the Medici family, became the birthplace of the Renaissance. Venice, with its vast maritime empire and wealth from trade, developed a distinctive artistic style characterized by rich colors and sensuous beauty. Rome, as the seat of the Catholic Church, attracted artists from across Italy to work on papal commissions, including the decoration of the Sistine Chapel.</p>
+                    
+                    <h3>Legacy</h3>
+                    <p>The Renaissance laid the foundations for modern Western culture. Its emphasis on individual achievement, scientific inquiry, and artistic excellence continues to influence our world today. The period produced some of history's greatest artists, including Leonardo da Vinci, Michelangelo, and Raphael, whose works remain celebrated and studied centuries after their creation.</p>
+                    
+                    <p>The Renaissance also saw significant advances in science, with figures like Galileo Galilei challenging traditional beliefs about the universe. The printing press, invented by Johannes Gutenberg, revolutionized the spread of knowledge, making books more accessible and contributing to increased literacy rates across Europe.</p>
+                </div>
+            </div>
+
+            <!-- Article 2 -->
+            <div class="article-view" id="article2">
+                <div class="article-header">
+                    <button class="back-button" onclick="showMenu()">← Back</button>
+                    <h1 class="article-title">Renaissance Artists & Techniques</h1>
+                </div>
+          <!--       <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/402px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg" alt="Mona Lisa" class="article-image"> -->
+                <div class="article-content">
+                    <p>The Renaissance period witnessed revolutionary developments in artistic techniques and the emergence of master artists whose works continue to captivate audiences worldwide. These innovations transformed the way artists approached their craft and set new standards for artistic excellence that would influence generations to come.</p>
+                    
+                    <h3>Linear Perspective</h3>
+                    <p>One of the most significant innovations of Renaissance art was the development of linear perspective by Filippo Brunelleschi in the early 15th century. This mathematical system allowed artists to create the illusion of three-dimensional space on a flat surface, with parallel lines appearing to converge at a vanishing point on the horizon.</p>
+                    
+                    <p>Artists like Masaccio and Piero della Francesca mastered this technique, creating paintings that seemed to open windows onto realistic scenes. The use of perspective transformed painting from a flat, decorative art into a medium capable of representing the visible world with unprecedented accuracy.</p>
+                    
+                    <h3>Sfumato and Chiaroscuro</h3>
+                    <p>Leonardo da Vinci pioneered the technique of sfumato, which involves the subtle blending of colors and tones to create soft, almost imperceptible transitions between light and shadow. This technique, most famously employed in the Mona Lisa, gave his paintings a mysterious, atmospheric quality and made his figures appear more lifelike and three-dimensional.</p>
+                    
+                    <p>Chiaroscuro, the dramatic use of light and shadow to create volume and depth, became another hallmark of Renaissance painting. Artists like Caravaggio would later take this technique to new extremes, using stark contrasts between light and dark to create powerful, emotionally charged compositions.</p>
+                    
+                    <h3>Anatomical Study</h3>
+                    <p>Renaissance artists were deeply interested in the accurate representation of the human body. Many, including Leonardo da Vinci and Michelangelo, conducted detailed anatomical studies, even performing dissections to better understand the structure of muscles, bones, and organs beneath the skin.</p>
+                    
+                    <p>This knowledge allowed them to depict the human form with unprecedented realism and grace. Michelangelo's David and his figures on the Sistine Chapel ceiling demonstrate a profound understanding of human anatomy and the ability to represent the body in complex, dynamic poses.</p>
+                    
+                    <h3>Master Artists</h3>
+                    <p>Leonardo da Vinci (1452-1519) epitomized the Renaissance ideal of the universal genius, excelling not only as a painter but also as a scientist, inventor, and engineer. His notebooks contain detailed observations of nature, innovative designs for machines, and studies of human anatomy that were centuries ahead of their time.</p>
+                    
+                    <p>Michelangelo Buonarroti (1475-1564) was renowned primarily as a sculptor but also created some of the most iconic paintings in Western art, including the ceiling of the Sistine Chapel. His works are characterized by heroic figures with powerful, muscular bodies that express intense emotion and spiritual struggle.</p>
+                    
+                    <p>Raphael Sanzio (1483-1520) was celebrated for his graceful compositions and the serene beauty of his figures. His frescoes in the Vatican, particularly "The School of Athens," exemplify the Renaissance ideals of harmony, balance, and the synthesis of classical philosophy with Christian theology.</p>
+                    
+                    <h3>Color and Composition</h3>
+                    <p>Renaissance artists developed sophisticated approaches to color theory and composition. The Venetian school, including artists like Titian and Giorgione, became famous for their use of rich, luminous colors and their ability to capture the effects of light on different surfaces.</p>
+                    
+                    <p>Composition became more dynamic and complex, with artists carefully orchestrating the arrangement of figures and objects to guide the viewer's eye through the painting and create a sense of narrative drama. The triangular composition, often used to create stability and focus, became a standard device in Renaissance art.</p>
+                    
+                    <h3>Lasting Impact</h3>
+                    <p>The techniques developed during the Renaissance formed the foundation of Western art education for centuries. Art academies taught students to master perspective, anatomy, and classical composition, ensuring that Renaissance principles continued to shape artistic practice long after the period itself had ended. Even today, these fundamental skills remain essential components of art training around the world.</p>
+                </div>
+            </div>
+        </div>
+    </div>
 
 <div class="dash-title"> RENAISSANCE NETWORK</div>
 <div class="zoom-controls">
@@ -139,6 +426,8 @@ html, body {
 
 <div id="netWrapper"><svg id="networkSvg"></svg></div>
 
+
+
 <!-- LEGEND PANEL — draggable + collapsible -->
 <div class="panel" id="legendPanel">
   <div class="panel-header" id="legendHeader">
@@ -146,11 +435,11 @@ html, body {
     <div class="panel-actions"><button class="panel-btn" id="legendToggle">−</button></div>
   </div>
   <div class="panel-body" id="legendBody">
-      <div class="legend-item"><span>This is a graphic about the renaissance era and their connections <br><br> </span></div>
+
     <div class="legend-item"><div class="legend-diamond"></div><span>Artist</span></div>
     <div class="legend-item"><div class="legend-octagon"></div><span>City</span></div>
     <div class="legend-item"><div class="legend-pop"></div><span>Population</span></div>
-  <div class="legend-item"><span>Here, on a network diagram, formed by nodes and links, stay the connections to pages of more information (in this case, the Wikipedia pages about Renaissance artists). An individual, the artist, might migrate and move across these centers where more opportunities arise, looking for patrons and comissions, moving away from agitated areas.
+  <div class="legend-item2"><span>Click on any artist node to see his connection to the main cities as well as his life span. Each node is connected to its Wikipedia page. Also there is more info available trough the top menu button.
 
  <br><br> </span></div>
   </div>
@@ -180,6 +469,44 @@ html, body {
 </div>
 
 <script>
+
+	 // Menu functionality
+        const menuToggle = document.getElementById('menuToggle');
+        const sideMenu = document.getElementById('sideMenu');
+        const overlay = document.getElementById('overlay');
+        const menuOptions = document.querySelectorAll('.menu-option');
+
+        menuToggle.addEventListener('click', function() {
+            menuToggle.classList.toggle('active');
+            sideMenu.classList.toggle('active');
+            overlay.classList.toggle('active');
+        });
+
+        overlay.addEventListener('click', function() {
+            menuToggle.classList.remove('active');
+            sideMenu.classList.remove('active');
+            overlay.classList.remove('active');
+        });
+
+        menuOptions.forEach(option => {
+            option.addEventListener('click', function() {
+                const articleNum = this.getAttribute('data-article');
+                showArticle(articleNum);
+            });
+        });
+
+        function showArticle(num) {
+            document.getElementById('menuOptions').style.display = 'none';
+            document.getElementById('article' + num).classList.add('active');
+        }
+
+        function showMenu() {
+            document.querySelectorAll('.article-view').forEach(article => {
+                article.classList.remove('active');
+            });
+            document.getElementById('menuOptions').style.display = 'block';
+        }
+
 
 /* ═══════════════════════════════════════════════════════════════
    DATA DEFINITIONS
