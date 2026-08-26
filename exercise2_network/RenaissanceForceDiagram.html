@@ -822,10 +822,16 @@ function selectNode(name, d) {
 document.addEventListener('click', e => {
   if (!e.target.closest('.network-node') && !e.target.closest('.timeline-node') && !e.target.closest('.panel')) {
     const { selectedOpacity: sO } = CONFIG.effects;
-    const { selectedOpacity: tsO } = CONFIG.timelineEffects;
+    const { deselectedOpacity: tdO } = CONFIG.timelineEffects;
+
     d3.selectAll('.network-node,.node-label').style('opacity', sO);
+    d3.selectAll('.node-label').style('font-size', CONFIG.node.labelFontSize + 'px');
+
     d3.selectAll('.network-link').style('opacity', sO);
-    d3.selectAll('.timeline-node,.tl-node-lbl').style('opacity', tsO);
+
+    d3.selectAll('.timeline-node,.tl-node-lbl').style('opacity', tdO);
+    d3.selectAll('.tl-node-lbl').style('font-size', CONFIG.timeline.labelFontSize + 'px');
+
     d3.selectAll('.timeline-arc').style('opacity', 0);
   }
 });
